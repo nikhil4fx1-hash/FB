@@ -28,7 +28,6 @@ def get_trending_topic():
         return "ഇന്നത്തെ പ്രധാന സോഷ്യൽ മീഡിയ ട്രെൻഡിങ് വിവാദം"
 
 def get_available_models():
-    print("\nനിങ്ങളുടെ അക്കൗണ്ടിൽ ലഭ്യമായ AI മോഡലുകൾ തിരയുന്നു...")
     url = f"https://generativelanguage.googleapis.com/v1beta/models?key={GEMINI_API_KEY}"
     available_models = []
     try:
@@ -45,11 +44,9 @@ def get_available_models():
 def get_post_content(topic):
     available_models = get_available_models()
     if not available_models:
-        print("API Key പ്രശ്നം: മോഡലുകൾ ലഭ്യമായില്ല.")
         return None, None, None
 
     preferences = ['gemini-3.8-flash', 'gemini-3.7-flash', 'gemini-4-argon', 'gemini-3.8-flash-lite', 'gemini-3.6-flash']
-    
     models_to_try = [m for m in preferences if m in available_models]
     if not models_to_try:
         models_to_try = available_models[:4] 
@@ -67,66 +64,51 @@ def get_post_content(topic):
     for model in models_to_try:
         url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={GEMINI_API_KEY}"
         try:
-            print(f"\n{model} ഉപയോഗിച്ച് പോസ്റ്റ് തയ്യാറാക്കാൻ ശ്രമിക്കുന്നു...")
             response = requests.post(url, headers=headers, json=data)
             result = response.json()
-            
             if 'candidates' in result:
                 text = result['candidates'][0]['content']['parts'][0]['text']
                 parts = text.strip().split('|')
                 if len(parts) >= 3:
                     return parts[0].strip(), parts[1].strip(), parts[2].strip()
-            else:
-                error_msg = result.get('error', {}).get('message', 'Unknown Error')
-                print(f"പരാജയപ്പെട്ടു! കാരണം: {error_msg}")
-                print("സെർവർ തിരക്കായതിനാൽ അടുത്ത മോഡലിലേക്ക് മാറുന്നു...")
-                
         except Exception as e:
-            print(f"കണക്ഷൻ എറർ: {e}")
+            continue
             
-    print("\nഎല്ലാ മോഡലുകളും പരാജയപ്പെട്ടു. പിന്നീട് വീണ്ടും ശ്രമിക്കുക.")
     return None, None, None
 
 def fetch_image(query):
     # സ്റ്റെപ്പ് 1: DuckDuckGo
-    print("DuckDuckGo വഴി ഫോട്ടോ എടുക്കാൻ ശ്രമിക്കുന്നു...")
     try:
         from ddgs import DDGS
         results = DDGS().images(query, max_results=1)
         if results:
             img_url = results[0]['image']
-            headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'}
+            headers = {'User-Agent': 'Mozilla/5.0'}
             response = requests.get(img_url, headers=headers, timeout=10)
-            
-            # ലഭിച്ചത് യഥാർത്ഥ ഫോട്ടോ ആണെന്ന് ഉറപ്പുവരുത്തുന്നു
             if response.status_code == 200 and 'image' in response.headers.get('Content-Type', ''):
                 return Image.open(BytesIO(response.content))
-            else:
-                print("DuckDuckGo ഫോട്ടോ ഡൗൺലോഡ് ചെയ്യാൻ അനുവദിച്ചില്ല.")
-    except Exception as e:
-        print(f"DuckDuckGo പരാജയപ്പെട്ടു: {e}")
+    except:
+        pass
 
-    # സ്റ്റെപ്പ് 2: Wikipedia Fallback (User-Agent ചേർത്ത്)
-    print("വിക്കിപീഡിയ വഴി ഫോട്ടോ എടുക്കാൻ ശ്രമിക്കുന്നു (Fallback)...")
+    # സ്റ്റെപ്പ് 2: Wikipedia Fallback
     try:
         search_term = " ".join(query.split()[:2]) 
         url = f"https://en.wikipedia.org/w/api.php?action=query&format=json&prop=pageimages&generator=search&gsrsearch={search_term}&gsrlimit=1&pithumbsize=1000"
-        
-        # വിക്കിപീഡിയ ബ്ലോക്ക് ചെയ്യാതിരിക്കാൻ കൃത്യമായ User-Agent നൽകുന്നു
         headers = {'User-Agent': 'AutoFBPostBot/1.0 (nikhiltk4u@gmail.com)'}
         res = requests.get(url, headers=headers, timeout=10).json()
-        
-        pages = res.get('query', {}).get('pages', {})
+        pages = res.get('query', {}).pages
         if pages:
             for page_id in pages:
                 img_url = pages[page_id].get('thumbnail', {}).get('source')
                 if img_url:
                     img_data = requests.get(img_url, headers=headers, timeout=10).content
                     return Image.open(BytesIO(img_data))
-    except Exception as e:
-        print("Wikipedia Fetch Error:", e)
+    except:
+        pass
         
-    return None
+    # സ്റ്റെപ്പ് 3: ഫോട്ടോ കിട്ടിയില്ലെങ്കിൽ ഒരു നല്ല ഗ്രേഡിയന്റ്/കളർ ബാക്ക്ഗ്രൗണ്ട് ഉണ്ടാക്കുന്നു
+    img = Image.new('RGB', (1080, 1080), color=(20, 24, 33))
+    return img
 
 def add_text_to_image(image, text):
     image = image.convert("RGB")
@@ -138,8 +120,8 @@ def add_text_to_image(image, text):
     except:
         font = ImageFont.load_default()
         
-    draw.rectangle(((0, height - int(height/5)), (width, height)), fill=(0, 0, 0, 200))
-    draw.text((20, height - int(height/6)), text, font=font, fill="yellow")
+    draw.rectangle(((0, height - int(height/4)), (width, height)), fill=(0, 0, 0, 220))
+    draw.text((30, height - int(height/4.5)), text, font=font, fill="yellow")
     
     image_path = "fb_post.jpg"
     image.save(image_path)
@@ -153,29 +135,14 @@ def post_to_facebook(image_path, caption):
     return response.json()
 
 def main():
-    print("ട്രെൻഡിങ് വിഷയം തിരയുന്നു...")
     topic = get_trending_topic()
-    print(f"കണ്ടെത്തിയ വിഷയം: {topic}")
-    
     image_text, caption, search_query = get_post_content(topic)
     
     if image_text and caption and search_query:
-        print(f"\nചോദ്യം: {image_text}\nക്യാപ്ഷൻ: {caption}\nസെർച്ച് കീവേർഡ്: {search_query}\n")
-        
-        print("ഫോട്ടോ ഡൗൺലോഡ് ചെയ്യുന്നു...")
         img = fetch_image(search_query)
-        
-        if img:
-            print("ചിത്രത്തിൽ മലയാളം എഴുതുന്നു...")
-            final_img = add_text_to_image(img, image_text)
-            
-            print("ഫേസ്ബുക്കിലേക്ക് പോസ്റ്റ് ചെയ്യുന്നു...")
-            res = post_to_facebook(final_img, caption)
-            print("വിജയകരം! ഫേസ്ബുക്ക് മറുപടി:", res)
-        else:
-            print("ചിത്രം കണ്ടെത്താനായില്ല.")
-    else:
-        print("പോസ്റ്റ് തയ്യാറാക്കാൻ കഴിഞ്ഞില്ല.")
+        final_img = add_text_to_image(img, image_text)
+        res = post_to_facebook(final_img, caption)
+        print("ഫേസ്ബുക്ക് മറുപടി:", res)
 
 if __name__ == "__main__":
     main()
