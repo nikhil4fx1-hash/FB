@@ -2,7 +2,6 @@ import requests
 import feedparser
 import random
 import os
-from duckduckgo_search import DDGS
 from PIL import Image, ImageDraw, ImageFont
 from io import BytesIO
 
@@ -54,7 +53,7 @@ def get_post_content(topic):
     
     models_to_try = [m for m in preferences if m in available_models]
     if not models_to_try:
-        models_to_try = available_models[:3] 
+        models_to_try = available_models[:4] 
         
     prompt = f"""
     വിഷയം: '{topic}'
@@ -66,7 +65,6 @@ def get_post_content(topic):
     headers = {'Content-Type': 'application/json'}
     data = {"contents": [{"parts": [{"text": prompt}]}]}
     
-    # ഒരു മോഡൽ തിരക്കാണെങ്കിൽ അടുത്തത് എടുക്കാൻ വേണ്ടി Loop ഉപയോഗിക്കുന്നു
     for model in models_to_try:
         url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={GEMINI_API_KEY}"
         try:
@@ -83,7 +81,6 @@ def get_post_content(topic):
                 error_msg = result.get('error', {}).get('message', 'Unknown Error')
                 print(f"പരാജയപ്പെട്ടു! കാരണം: {error_msg}")
                 print("സെർവർ തിരക്കായതിനാൽ അടുത്ത മോഡലിലേക്ക് മാറുന്നു...")
-                # തിരക്കാണെങ്കിൽ ലൂപ്പ് അടുത്ത മോഡലിലേക്ക് തനിയെ പോകും
                 
         except Exception as e:
             print(f"കണക്ഷൻ എറർ: {e}")
@@ -92,15 +89,35 @@ def get_post_content(topic):
     return None, None, None
 
 def fetch_image(query):
+    # സ്റ്റെപ്പ് 1: പുതിയ ലൈബ്രറി ഉപയോഗിച്ച് DuckDuckGo-ൽ ശ്രമിക്കുന്നു
+    print("DuckDuckGo വഴി ഫോട്ടോ എടുക്കാൻ ശ്രമിക്കുന്നു...")
     try:
+        from ddgs import DDGS
         results = DDGS().images(query, max_results=1)
         if results:
             img_url = results[0]['image']
             headers = {'User-Agent': 'Mozilla/5.0'}
-            img_data = requests.get(img_url, headers=headers).content
+            img_data = requests.get(img_url, headers=headers, timeout=10).content
             return Image.open(BytesIO(img_data))
     except Exception as e:
-        print("Image Fetch Error:", e)
+        print(f"DuckDuckGo പരാജയപ്പെട്ടു (Rate Limit): {e}")
+
+    # സ്റ്റെപ്പ് 2: പരാജയപ്പെട്ടാൽ തനിയെ വിക്കിപീഡിയയിൽ നിന്നും ഒറിജിനൽ ഫോട്ടോ എടുക്കുന്നു
+    print("വിക്കിപീഡിയ വഴി ഫോട്ടോ എടുക്കാൻ ശ്രമിക്കുന്നു (Fallback)...")
+    try:
+        search_term = " ".join(query.split()[:2]) # കൂടുതൽ കൃത്യതയ്ക്ക് ആദ്യത്തെ 2 വാക്കുകൾ എടുക്കുന്നു
+        url = f"https://en.wikipedia.org/w/api.php?action=query&format=json&prop=pageimages&generator=search&gsrsearch={search_term}&gsrlimit=1&pithumbsize=1000"
+        res = requests.get(url, timeout=10).json()
+        pages = res.get('query', {}).get('pages', {})
+        if pages:
+            for page_id in pages:
+                img_url = pages[page_id].get('thumbnail', {}).get('source')
+                if img_url:
+                    img_data = requests.get(img_url, timeout=10).content
+                    return Image.open(BytesIO(img_data))
+    except Exception as e:
+        print("Wikipedia Fetch Error:", e)
+        
     return None
 
 def add_text_to_image(image, text):
