@@ -38,15 +38,14 @@ def get_working_model():
         if 'models' in data:
             available_models = []
             for m in data['models']:
-                # കണ്ടന്റ് ജനറേറ്റ് ചെയ്യാൻ പറ്റുന്ന മോഡലുകൾ മാത്രം വേർതിരിക്കുന്നു
                 if 'generateContent' in m.get('supportedGenerationMethods', []):
                     model_name = m['name'].split('/')[-1]
                     available_models.append(model_name)
                     
             print(f"നിങ്ങളുടെ API Key-ക്ക് ലഭ്യമായ മോഡലുകൾ: {available_models}")
             
-            # ലഭ്യമായതിൽ നിന്നും ഏറ്റവും മികച്ചത് തനിയെ തിരഞ്ഞെടുക്കുന്നു
-            for pref in ['gemini-1.5-flash', 'gemini-1.5-pro', 'gemini-pro', 'gemini-1.0-pro']:
+            # ഏറ്റവും പുതിയ gemini-3.8-flash മോഡലിന് മുൻഗണന നൽകുന്നു
+            for pref in ['gemini-3.8-flash', 'gemini-4-argon', 'gemini-4-carbon', 'gemini-3.8-flash-lite']:
                 if pref in available_models:
                     print(f"തിരഞ്ഞെടുത്ത മോഡൽ: {pref}")
                     return pref
@@ -61,7 +60,6 @@ def get_working_model():
     return None
 
 def get_post_content(topic):
-    # വർക്ക് ആകുന്ന മോഡൽ ആദ്യം കണ്ടെത്തുന്നു
     model = get_working_model()
     
     if not model:
