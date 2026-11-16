@@ -1,5 +1,5 @@
 requests
 feedparser
-google-genai
+google-generativeai
 duckduckgo-search
 pillow
