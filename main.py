@@ -2,7 +2,7 @@ import requests
 import feedparser
 import random
 import os
-from google import genai
+import google.generativeai as genai
 from duckduckgo_search import DDGS
 from PIL import Image, ImageDraw, ImageFont
 from io import BytesIO
@@ -14,7 +14,7 @@ FB_PAGE_ID = os.environ.get("FB_PAGE_ID")
 # =================================================
 
 def get_trending_topic():
-    # ഗൂഗിൾ ന്യൂസ് (മലയാളം) പ്രധാന വാർത്തകൾ
+    # ഗൂഗിൾ ന്യൂസ് (മലയാളം) പ്രധാന വാർത്തകൾ 
     rss_url = "https://news.google.com/rss?hl=ml&gl=IN&ceid=IN:ml"
     
     try:
@@ -33,27 +33,37 @@ def get_trending_topic():
         return "ഇന്നത്തെ പ്രധാന സോഷ്യൽ മീഡിയ ട്രെൻഡിങ് വിവാദം"
 
 def get_post_content(topic):
-    try:
-        # പുതിയ ഗൂഗിൾ GenAI കണക്ഷൻ
-        client = genai.Client(api_key=GEMINI_API_KEY)
-        
-        prompt = f"""
-        വിഷയം: '{topic}'
-        ഈ വിഷയത്തെ അടിസ്ഥാനമാക്കി താഴെ പറയുന്ന 3 കാര്യങ്ങൾ തയ്യാറാക്കുക. 
-        മറുപടി കൃത്യമായി '|' ഉപയോഗിച്ച് വേർതിരിച്ചിരിക്കണം. വേറെ ഒന്നും എഴുതരുത്.
-        
-        ഫോർമാറ്റ്: [ചിത്രത്തിൽ എഴുതാനുള്ള വായനക്കാരെ ചിന്തിപ്പിക്കുന്ന ഒരു വരി മലയാളം ചോദ്യം] | [ഫേസ്ബുക്കിൽ ഇടാനുള്ള വിമർശനാത്മകമായ മലയാളം ക്യാപ്ഷൻ (ഹാഷ്‌ടാഗ് അടക്കം)] | [High quality, watermark free ഫോട്ടോ ഇന്റർനെറ്റിൽ തിരയാനുള്ള 2-3 ഇംഗ്ലീഷ് വാക്കുകൾ (ഉദാ: Kerala Chief minister high resolution)]
-        """
-        
-        response = client.models.generate_content(
-            model='gemini-1.5-flash',
-            contents=prompt
-        )
-        parts = response.text.strip().split('|')
-        if len(parts) >= 3:
-            return parts[0].strip(), parts[1].strip(), parts[2].strip()
-    except Exception as e:
-        print("Gemini Error:", e)
+    genai.configure(api_key=GEMINI_API_KEY)
+    
+    prompt = f"""
+    വിഷയം: '{topic}'
+    ഈ വിഷയത്തെ അടിസ്ഥാനമാക്കി താഴെ പറയുന്ന 3 കാര്യങ്ങൾ തയ്യാറാക്കുക. 
+    മറുപടി കൃത്യമായി '|' ഉപയോഗിച്ച് വേർതിരിച്ചിരിക്കണം. വേറെ ഒന്നും എഴുതരുത്.
+    
+    ഫോർമാറ്റ്: [ചിത്രത്തിൽ എഴുതാനുള്ള വായനക്കാരെ ചിന്തിപ്പിക്കുന്ന ഒരു വരി മലയാളം ചോദ്യം] | [ഫേസ്ബുക്കിൽ ഇടാനുള്ള വിമർശനാത്മകമായ മലയാളം ക്യാപ്ഷൻ (ഹാഷ്‌ടാഗ് അടക്കം)] | [High quality, watermark free ഫോട്ടോ ഇന്റർനെറ്റിൽ തിരയാനുള്ള 2-3 ഇംഗ്ലീഷ് വാക്കുകൾ (ഉദാ: Kerala Chief minister high resolution)]
+    """
+    
+    # നിങ്ങളുടെ API Key-ക്ക് സപ്പോർട്ട് ചെയ്യുന്ന മോഡൽ കണ്ടെത്താൻ ഒരു ലിസ്റ്റ് ഉപയോഗിക്കുന്നു
+    models_to_try = [
+        'gemini-1.5-flash',
+        'gemini-1.5-flash-latest',
+        'gemini-1.5-pro',
+        'gemini-pro' # ഇത് എല്ലാവർക്കും എപ്പോഴും വർക്ക് ആകുന്ന മോഡലാണ്
+    ]
+    
+    for model_name in models_to_try:
+        try:
+            print(f"Trying model: {model_name}...")
+            model = genai.GenerativeModel(model_name)
+            response = model.generate_content(prompt)
+            parts = response.text.strip().split('|')
+            if len(parts) >= 3:
+                return parts[0].strip(), parts[1].strip(), parts[2].strip()
+        except Exception as e:
+            print(f"{model_name} വർക്ക് ആയില്ല. അടുത്തത് പരീക്ഷിക്കുന്നു...")
+            continue
+            
+    print("ഒരു മോഡലും വർക്ക് ആയില്ല. API Key പ്രശ്നമാകാം.")
     return None, None, None
 
 def fetch_image(query):
