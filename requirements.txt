@@ -1,4 +1,4 @@
 requests
 feedparser
-duckduckgo-search
+ddgs
 pillow
