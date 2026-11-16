@@ -45,11 +45,8 @@ def get_post_content(topic):
     if not available_models:
         return None, None, None
 
-    # അക്കൗണ്ടിലുള്ള എല്ലാ മോഡലുകളും ട്രൈ ചെയ്യാൻ ഒരു ലിസ്റ്റ് തയ്യാറാക്കുന്നു
     preferences = ['gemini-3.8-flash', 'gemini-3.7-flash', 'gemini-3.6-flash', 'gemini-4-argon', 'gemini-4-carbon', 'gemini-4-hydrogen', 'gemini-3.8-flash-lite']
     models_to_try = [m for m in preferences if m in available_models]
-    
-    # മുൻഗണനാ ലിസ്റ്റിൽ ഇല്ലാത്ത ബാക്കി മോഡലുകൾ കൂടി ഇതിലേക്ക് ചേർക്കുന്നു (Maximum Backup)
     for m in available_models:
         if m not in models_to_try:
             models_to_try.append(m)
@@ -75,10 +72,7 @@ def get_post_content(topic):
                 parts = text.strip().split('|')
                 if len(parts) >= 3:
                     return parts[0].strip(), parts[1].strip(), parts[2].strip()
-            else:
-                print(f"പരാജയപ്പെട്ടു (അടുത്ത മോഡലിലേക്ക് മാറുന്നു): {result.get('error', {}).get('message')}")
         except Exception as e:
-            print(f"Timeout/Error ({model}): {e}")
             continue
             
     return None, None, None
@@ -120,20 +114,71 @@ def add_text_to_image(image, text):
     draw = ImageDraw.Draw(image)
     
     try:
-        font = ImageFont.truetype("Manjari-Bold.ttf", int(width/15))
+        # ഫോണ്ട് സൈസ് അല്പം കുറച്ചു (ചെറുതായി കാണാൻ)
+        font = ImageFont.truetype("Manjari-Bold.ttf", int(width/20))
     except:
         font = ImageFont.load_default()
         
-    draw.rectangle(((0, height - int(height/4)), (width, height)), fill=(0, 0, 0, 220))
-    draw.text((30, height - int(height/4.5)), text, font=font, fill="yellow")
+    margin = 40
+    max_width = width - (margin * 2)
     
+    # വരികൾ മുറിക്കുന്നതിനുള്ള ലോജിക് (Text Wrapping)
+    words = text.split(' ')
+    lines = []
+    current_line = []
+    
+    for word in words:
+        test_line = " ".join(current_line + [word])
+        try:
+            bbox = draw.textbbox((0, 0), test_line, font=font)
+            text_w = bbox[2] - bbox[0]
+        except:
+            text_w = font.getsize(test_line)[0]
+            
+        if text_w <= max_width:
+            current_line.append(word)
+        else:
+            if current_line:
+                lines.append(" ".join(current_line))
+                current_line = [word]
+            else:
+                lines.append(word)
+    if current_line:
+        lines.append(" ".join(current_line))
+        
+    # വരികളുടെ എണ്ണം അനുസരിച്ച് ഉയരം കൂട്ടുന്നു
+    try:
+        line_height = draw.textbbox((0, 0), "ക്യ", font=font)[3] - draw.textbbox((0, 0), "ക്യ", font=font)[1]
+    except:
+        line_height = font.getsize("ക്യ")[1]
+        
+    line_spacing = 15
+    total_text_height = (len(lines) * line_height) + ((len(lines) - 1) * line_spacing)
+    
+    box_top = height - total_text_height - 60
+    
+    # പിന്നിലെ കറുപ്പ് ബോക്സ്
+    draw.rectangle(((0, box_top), (width, height)), fill=(0, 0, 0, 200))
+    
+    # ടെക്സ്റ്റ് മധ്യഭാഗത്തായി (Center Align) എഴുതുന്നു
+    y_text = box_top + 30
+    for line in lines:
+        try:
+            bbox = draw.textbbox((0, 0), line, font=font)
+            text_w = bbox[2] - bbox[0]
+        except:
+            text_w = font.getsize(line)[0]
+            
+        x_text = (width - text_w) / 2
+        draw.text((x_text, y_text), line, font=font, fill="yellow")
+        y_text += line_height + line_spacing
+        
     image_path = "fb_post.jpg"
     image.save(image_path)
     return image_path
 
 def post_to_facebook(image_path, caption):
     print("ഫേസ്ബുക്കിലേക്ക് പോസ്റ്റ് ചെയ്യുന്നു...")
-    # ഇവിടെ നമ്മൾ User Token മാറ്റി Page Token ആക്കിയതുകൊണ്ട് 'me' എന്ന് കൊടുത്തത് കൃത്യമായി വർക്ക് ചെയ്യും!
     url = "https://graph.facebook.com/v18.0/me/photos"
     payload = {'caption': caption, 'access_token': FB_PAGE_ACCESS_TOKEN}
     files = {'source': open(image_path, 'rb')}
