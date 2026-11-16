@@ -14,21 +14,18 @@ FB_PAGE_ID = os.environ.get("FB_PAGE_ID")
 # =================================================
 
 def get_trending_topic():
-    # ഗൂഗിൾ ട്രെൻഡ്സ് (ഇന്ത്യ) - അന്ന് ഇന്ത്യയിൽ ഏറ്റവും ട്രെൻഡിങ് ആയ കാര്യങ്ങൾ മാത്രം കിട്ടാൻ
-    rss_url = "https://trends.google.com/trends/trendingsearches/daily/rss?geo=IN"
+    # ഗൂഗിൾ ന്യൂസ് (മലയാളം) പ്രധാന വാർത്തകൾ - GitHub ആക്ഷൻസിനെ ബ്ലോക്ക് ചെയ്യില്ല
+    rss_url = "https://news.google.com/rss?hl=ml&gl=IN&ceid=IN:ml"
     
     try:
-        # ചില വെബ്സൈറ്റുകൾ ബ്ലോക്ക് ചെയ്യാതിരിക്കാൻ User-Agent ചേർക്കുന്നു
         headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'}
         response = requests.get(rss_url, headers=headers)
         feed = feedparser.parse(response.content)
         
         if feed.entries:
-            # ആദ്യത്തെ 5 ട്രെൻഡിങ് വിഷയങ്ങളിൽ നിന്നും ഒരെണ്ണം എടുക്കുന്നു
+            # ആദ്യത്തെ 5 പ്രധാന വാർത്തകളിൽ നിന്നും ഒരെണ്ണം എടുക്കുന്നു
             entry = random.choice(feed.entries[:5])
-            topic = entry.title
-            description = entry.description if hasattr(entry, 'description') else ""
-            return f"Topic: {topic}, Details: {description}"
+            return f"Topic: {entry.title}"
         else:
             return "ഇന്ത്യയിലെ ഇന്നത്തെ പ്രധാന രാഷ്ട്രീയ അല്ലെങ്കിൽ കായിക ചർച്ചാവിഷയം"
             
@@ -38,7 +35,8 @@ def get_trending_topic():
 
 def get_post_content(topic):
     genai.configure(api_key=GEMINI_API_KEY)
-    model = genai.GenerativeModel('gemini-1.5-flash')
+    # മോഡലിന്റെ പേര് അപ്ഡേറ്റ് ചെയ്തു
+    model = genai.GenerativeModel('gemini-1.5-flash-latest')
     
     prompt = f"""
     വിഷയം: '{topic}'
