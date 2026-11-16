@@ -2,7 +2,6 @@ import requests
 import feedparser
 import random
 import os
-import google.generativeai as genai
 from duckduckgo_search import DDGS
 from PIL import Image, ImageDraw, ImageFont
 from io import BytesIO
@@ -16,7 +15,6 @@ FB_PAGE_ID = os.environ.get("FB_PAGE_ID")
 def get_trending_topic():
     # ഗൂഗിൾ ന്യൂസ് (മലയാളം) പ്രധാന വാർത്തകൾ 
     rss_url = "https://news.google.com/rss?hl=ml&gl=IN&ceid=IN:ml"
-    
     try:
         headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'}
         response = requests.get(rss_url, headers=headers)
@@ -27,43 +25,40 @@ def get_trending_topic():
             return f"Topic: {entry.title}"
         else:
             return "ഇന്ത്യയിലെ ഇന്നത്തെ പ്രധാന രാഷ്ട്രീയ അല്ലെങ്കിൽ കായിക ചർച്ചാവിഷയം"
-            
     except Exception as e:
         print("Trending Fetch Error:", e)
         return "ഇന്നത്തെ പ്രധാന സോഷ്യൽ മീഡിയ ട്രെൻഡിങ് വിവാദം"
 
 def get_post_content(topic):
-    genai.configure(api_key=GEMINI_API_KEY)
+    # ലൈബ്രറി ഇല്ലാതെ നേരിട്ടുള്ള സുരക്ഷിതമായ API കോൾ (REST API)
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={GEMINI_API_KEY}"
     
     prompt = f"""
     വിഷയം: '{topic}'
     ഈ വിഷയത്തെ അടിസ്ഥാനമാക്കി താഴെ പറയുന്ന 3 കാര്യങ്ങൾ തയ്യാറാക്കുക. 
     മറുപടി കൃത്യമായി '|' ഉപയോഗിച്ച് വേർതിരിച്ചിരിക്കണം. വേറെ ഒന്നും എഴുതരുത്.
     
-    ഫോർമാറ്റ്: [ചിത്രത്തിൽ എഴുതാനുള്ള വായനക്കാരെ ചിന്തിപ്പിക്കുന്ന ഒരു വരി മലയാളം ചോദ്യം] | [ഫേസ്ബുക്കിൽ ഇടാനുള്ള വിമർശനാത്മകമായ മലയാളം ക്യാപ്ഷൻ (ഹാഷ്‌ടാഗ് അടക്കം)] | [High quality, watermark free ഫോട്ടോ ഇന്റർനെറ്റിൽ തിരയാനുള്ള 2-3 ഇംഗ്ലീഷ് വാക്കുകൾ (ഉദാ: Kerala Chief minister high resolution)]
+    ഫോർമാറ്റ്: [ചിത്രത്തിൽ എഴുതാനുള്ള വായനക്കാരെ ചിന്തിപ്പിക്കുന്ന ഒരു വരി മലയാളം ചോദ്യം] | [ഫേസ്ബുക്കിൽ ഇടാനുള്ള വിമർശനാത്മകമായ മലയാളം ക്യാപ്ഷൻ (ഹാഷ്‌ടാഗ് അടക്കം)] | [High quality, watermark free ഫോട്ടോ ഇന്റർനെറ്റിൽ തിരയാനുള്ള 2-3 ഇംഗ്ലീഷ് വാക്കുകൾ]
     """
     
-    # നിങ്ങളുടെ API Key-ക്ക് സപ്പോർട്ട് ചെയ്യുന്ന മോഡൽ കണ്ടെത്താൻ ഒരു ലിസ്റ്റ് ഉപയോഗിക്കുന്നു
-    models_to_try = [
-        'gemini-1.5-flash',
-        'gemini-1.5-flash-latest',
-        'gemini-1.5-pro',
-        'gemini-pro' # ഇത് എല്ലാവർക്കും എപ്പോഴും വർക്ക് ആകുന്ന മോഡലാണ്
-    ]
+    headers = {'Content-Type': 'application/json'}
+    data = {"contents": [{"parts": [{"text": prompt}]}]}
     
-    for model_name in models_to_try:
-        try:
-            print(f"Trying model: {model_name}...")
-            model = genai.GenerativeModel(model_name)
-            response = model.generate_content(prompt)
-            parts = response.text.strip().split('|')
+    try:
+        response = requests.post(url, headers=headers, json=data)
+        result = response.json()
+        
+        if 'candidates' in result:
+            text = result['candidates'][0]['content']['parts'][0]['text']
+            parts = text.strip().split('|')
             if len(parts) >= 3:
                 return parts[0].strip(), parts[1].strip(), parts[2].strip()
-        except Exception as e:
-            print(f"{model_name} വർക്ക് ആയില്ല. അടുത്തത് പരീക്ഷിക്കുന്നു...")
-            continue
+        else:
+            print("Gemini API നൽകിയ എറർ:", result)
             
-    print("ഒരു മോഡലും വർക്ക് ആയില്ല. API Key പ്രശ്നമാകാം.")
+    except Exception as e:
+        print("Gemini കണക്ഷൻ പരാജയപ്പെട്ടു:", e)
+        
     return None, None, None
 
 def fetch_image(query):
