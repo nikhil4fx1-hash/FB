@@ -8,24 +8,38 @@ from PIL import Image, ImageDraw, ImageFont
 from io import BytesIO
 
 # ================= കോൺഫിഗറേഷൻ =================
-# GitHub Secrets വഴി കൊടുക്കേണ്ട ഡാറ്റകൾ
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
 FB_PAGE_ACCESS_TOKEN = os.environ.get("FB_PAGE_ACCESS_TOKEN")
 FB_PAGE_ID = os.environ.get("FB_PAGE_ID")
 # =================================================
 
 def get_trending_topic():
-    # ട്രെൻഡിങ് വിഷയങ്ങൾ എടുക്കാൻ (ഏഷ്യാനെറ്റ് RSS)
-    rss_url = "https://malayalam.asianetnews.com/rss/latest-news"
-    feed = feedparser.parse(rss_url)
-    entry = random.choice(feed.entries[:5])
-    return entry.title
+    # ഗൂഗിൾ ട്രെൻഡ്സ് (ഇന്ത്യ) - അന്ന് ഇന്ത്യയിൽ ഏറ്റവും ട്രെൻഡിങ് ആയ കാര്യങ്ങൾ മാത്രം കിട്ടാൻ
+    rss_url = "https://trends.google.com/trends/trendingsearches/daily/rss?geo=IN"
+    
+    try:
+        # ചില വെബ്സൈറ്റുകൾ ബ്ലോക്ക് ചെയ്യാതിരിക്കാൻ User-Agent ചേർക്കുന്നു
+        headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'}
+        response = requests.get(rss_url, headers=headers)
+        feed = feedparser.parse(response.content)
+        
+        if feed.entries:
+            # ആദ്യത്തെ 5 ട്രെൻഡിങ് വിഷയങ്ങളിൽ നിന്നും ഒരെണ്ണം എടുക്കുന്നു
+            entry = random.choice(feed.entries[:5])
+            topic = entry.title
+            description = entry.description if hasattr(entry, 'description') else ""
+            return f"Topic: {topic}, Details: {description}"
+        else:
+            return "ഇന്ത്യയിലെ ഇന്നത്തെ പ്രധാന രാഷ്ട്രീയ അല്ലെങ്കിൽ കായിക ചർച്ചാവിഷയം"
+            
+    except Exception as e:
+        print("Trending Fetch Error:", e)
+        return "ഇന്നത്തെ പ്രധാന സോഷ്യൽ മീഡിയ ട്രെൻഡിങ് വിവാദം"
 
 def get_post_content(topic):
     genai.configure(api_key=GEMINI_API_KEY)
     model = genai.GenerativeModel('gemini-1.5-flash')
     
-    # കൃത്യമായ പോസ്റ്റ് കിട്ടാനുള്ള പ്രോംപ്റ്റ്
     prompt = f"""
     വിഷയം: '{topic}'
     ഈ വിഷയത്തെ അടിസ്ഥാനമാക്കി താഴെ പറയുന്ന 3 കാര്യങ്ങൾ തയ്യാറാക്കുക. 
@@ -48,7 +62,8 @@ def fetch_image(query):
         results = DDGS().images(query, max_results=1)
         if results:
             img_url = results[0]['image']
-            img_data = requests.get(img_url).content
+            headers = {'User-Agent': 'Mozilla/5.0'}
+            img_data = requests.get(img_url, headers=headers).content
             return Image.open(BytesIO(img_data))
     except Exception as e:
         print("Image Fetch Error:", e)
@@ -59,11 +74,12 @@ def add_text_to_image(image, text):
     width, height = image.size
     draw = ImageDraw.Draw(image)
     
-    # മലയാളം ഫോണ്ട് (നിങ്ങളുടെ ഗിറ്റ്ഹബ്ബിൽ Manjari-Bold.ttf ഉണ്ടായിരിക്കണം)
+    # മലയാളം ഫോണ്ട് (Manjari-Bold.ttf ഫയൽ റെപ്പോസിറ്ററിയിൽ ഉണ്ടെന്ന് ഉറപ്പാക്കുക)
     try:
         font = ImageFont.truetype("Manjari-Bold.ttf", int(width/15))
     except:
         font = ImageFont.load_default()
+        print("ഫോണ്ട് കണ്ടെത്താനായില്ല!")
         
     # ഷാഡോ ബോക്സും മഞ്ഞ നിറത്തിൽ അക്ഷരങ്ങളും
     draw.rectangle(((0, height - int(height/5)), (width, height)), fill=(0, 0, 0, 200))
@@ -81,20 +97,29 @@ def post_to_facebook(image_path, caption):
     return response.json()
 
 def main():
+    print("ട്രെൻഡിങ് വിഷയം തിരയുന്നു...")
     topic = get_trending_topic()
-    print(f"Topic: {topic}")
+    print(f"കണ്ടെത്തിയ വിഷയം: {topic}\n")
     
+    print("Gemini വഴി പോസ്റ്റ് തയ്യാറാക്കുന്നു...")
     image_text, caption, search_query = get_post_content(topic)
-    print(f"Query: {search_query}")
+    print(f"ചോദ്യം: {image_text}\nക്യാപ്ഷൻ: {caption}\nസെർച്ച് കീവേർഡ്: {search_query}\n")
     
     if search_query:
+        print("ഫോട്ടോ ഡൗൺലോഡ് ചെയ്യുന്നു...")
         img = fetch_image(search_query)
+        
         if img:
+            print("ചിത്രത്തിൽ മലയാളം എഴുതുന്നു...")
             final_img = add_text_to_image(img, image_text)
+            
+            print("ഫേസ്ബുക്കിലേക്ക് പോസ്റ്റ് ചെയ്യുന്നു...")
             res = post_to_facebook(final_img, caption)
-            print("Success:", res)
+            print("വിജയകരം! ഫേസ്ബുക്ക് മറുപടി:", res)
         else:
-            print("Image not found")
+            print("ചിത്രം കണ്ടെത്താനായില്ല.")
+    else:
+        print("പോസ്റ്റ് തയ്യാറാക്കാൻ കഴിഞ്ഞില്ല.")
 
 if __name__ == "__main__":
     main()
