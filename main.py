@@ -2,7 +2,7 @@ import requests
 import feedparser
 import random
 import os
-import google.generativeai as genai
+from google import genai
 from duckduckgo_search import DDGS
 from PIL import Image, ImageDraw, ImageFont
 from io import BytesIO
@@ -14,7 +14,7 @@ FB_PAGE_ID = os.environ.get("FB_PAGE_ID")
 # =================================================
 
 def get_trending_topic():
-    # ഗൂഗിൾ ന്യൂസ് (മലയാളം) പ്രധാന വാർത്തകൾ - GitHub ആക്ഷൻസിനെ ബ്ലോക്ക് ചെയ്യില്ല
+    # ഗൂഗിൾ ന്യൂസ് (മലയാളം) പ്രധാന വാർത്തകൾ
     rss_url = "https://news.google.com/rss?hl=ml&gl=IN&ceid=IN:ml"
     
     try:
@@ -23,7 +23,6 @@ def get_trending_topic():
         feed = feedparser.parse(response.content)
         
         if feed.entries:
-            # ആദ്യത്തെ 5 പ്രധാന വാർത്തകളിൽ നിന്നും ഒരെണ്ണം എടുക്കുന്നു
             entry = random.choice(feed.entries[:5])
             return f"Topic: {entry.title}"
         else:
@@ -34,19 +33,22 @@ def get_trending_topic():
         return "ഇന്നത്തെ പ്രധാന സോഷ്യൽ മീഡിയ ട്രെൻഡിങ് വിവാദം"
 
 def get_post_content(topic):
-    genai.configure(api_key=GEMINI_API_KEY)
-    # മോഡലിന്റെ പേര് അപ്ഡേറ്റ് ചെയ്തു
-    model = genai.GenerativeModel('gemini-1.5-flash-latest')
-    
-    prompt = f"""
-    വിഷയം: '{topic}'
-    ഈ വിഷയത്തെ അടിസ്ഥാനമാക്കി താഴെ പറയുന്ന 3 കാര്യങ്ങൾ തയ്യാറാക്കുക. 
-    മറുപടി കൃത്യമായി '|' ഉപയോഗിച്ച് വേർതിരിച്ചിരിക്കണം. വേറെ ഒന്നും എഴുതരുത്.
-    
-    ഫോർമാറ്റ്: [ചിത്രത്തിൽ എഴുതാനുള്ള വായനക്കാരെ ചിന്തിപ്പിക്കുന്ന ഒരു വരി മലയാളം ചോദ്യം] | [ഫേസ്ബുക്കിൽ ഇടാനുള്ള വിമർശനാത്മകമായ മലയാളം ക്യാപ്ഷൻ (ഹാഷ്‌ടാഗ് അടക്കം)] | [High quality, watermark free ഫോട്ടോ ഇന്റർനെറ്റിൽ തിരയാനുള്ള 2-3 ഇംഗ്ലീഷ് വാക്കുകൾ (ഉദാ: Kerala Chief minister high resolution)]
-    """
     try:
-        response = model.generate_content(prompt)
+        # പുതിയ ഗൂഗിൾ GenAI കണക്ഷൻ
+        client = genai.Client(api_key=GEMINI_API_KEY)
+        
+        prompt = f"""
+        വിഷയം: '{topic}'
+        ഈ വിഷയത്തെ അടിസ്ഥാനമാക്കി താഴെ പറയുന്ന 3 കാര്യങ്ങൾ തയ്യാറാക്കുക. 
+        മറുപടി കൃത്യമായി '|' ഉപയോഗിച്ച് വേർതിരിച്ചിരിക്കണം. വേറെ ഒന്നും എഴുതരുത്.
+        
+        ഫോർമാറ്റ്: [ചിത്രത്തിൽ എഴുതാനുള്ള വായനക്കാരെ ചിന്തിപ്പിക്കുന്ന ഒരു വരി മലയാളം ചോദ്യം] | [ഫേസ്ബുക്കിൽ ഇടാനുള്ള വിമർശനാത്മകമായ മലയാളം ക്യാപ്ഷൻ (ഹാഷ്‌ടാഗ് അടക്കം)] | [High quality, watermark free ഫോട്ടോ ഇന്റർനെറ്റിൽ തിരയാനുള്ള 2-3 ഇംഗ്ലീഷ് വാക്കുകൾ (ഉദാ: Kerala Chief minister high resolution)]
+        """
+        
+        response = client.models.generate_content(
+            model='gemini-1.5-flash',
+            contents=prompt
+        )
         parts = response.text.strip().split('|')
         if len(parts) >= 3:
             return parts[0].strip(), parts[1].strip(), parts[2].strip()
@@ -101,9 +103,10 @@ def main():
     
     print("Gemini വഴി പോസ്റ്റ് തയ്യാറാക്കുന്നു...")
     image_text, caption, search_query = get_post_content(topic)
-    print(f"ചോദ്യം: {image_text}\nക്യാപ്ഷൻ: {caption}\nസെർച്ച് കീവേർഡ്: {search_query}\n")
     
-    if search_query:
+    if image_text and caption and search_query:
+        print(f"ചോദ്യം: {image_text}\nക്യാപ്ഷൻ: {caption}\nസെർച്ച് കീവേർഡ്: {search_query}\n")
+        
         print("ഫോട്ടോ ഡൗൺലോഡ് ചെയ്യുന്നു...")
         img = fetch_image(search_query)
         
