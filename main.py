@@ -14,7 +14,6 @@ def get_trending_topic():
     rss_url = "https://news.google.com/rss?hl=ml&gl=IN&ceid=IN:ml"
     try:
         headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'}
-        # 30 സെക്കൻഡ് സമയം നൽകുന്നു
         response = requests.get(rss_url, headers=headers, timeout=30)
         feed = feedparser.parse(response.content)
         
@@ -46,11 +45,15 @@ def get_post_content(topic):
     if not available_models:
         return None, None, None
 
-    preferences = ['gemini-3.8-flash', 'gemini-3.7-flash', 'gemini-4-argon', 'gemini-3.8-flash-lite', 'gemini-3.6-flash']
+    # അക്കൗണ്ടിലുള്ള എല്ലാ മോഡലുകളും ട്രൈ ചെയ്യാൻ ഒരു ലിസ്റ്റ് തയ്യാറാക്കുന്നു
+    preferences = ['gemini-3.8-flash', 'gemini-3.7-flash', 'gemini-3.6-flash', 'gemini-4-argon', 'gemini-4-carbon', 'gemini-4-hydrogen', 'gemini-3.8-flash-lite']
     models_to_try = [m for m in preferences if m in available_models]
-    if not models_to_try:
-        models_to_try = available_models[:4] 
-        
+    
+    # മുൻഗണനാ ലിസ്റ്റിൽ ഇല്ലാത്ത ബാക്കി മോഡലുകൾ കൂടി ഇതിലേക്ക് ചേർക്കുന്നു (Maximum Backup)
+    for m in available_models:
+        if m not in models_to_try:
+            models_to_try.append(m)
+            
     prompt = f"""
     വിഷയം: '{topic}'
     ഈ വിഷയത്തെ അടിസ്ഥാനമാക്കി താഴെ പറയുന്ന 3 കാര്യങ്ങൾ തയ്യാറാക്കുക. 
@@ -64,8 +67,7 @@ def get_post_content(topic):
     for model in models_to_try:
         url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={GEMINI_API_KEY}"
         try:
-            print(f"\n{model} ഉപയോഗിച്ച് പോസ്റ്റ് തയ്യാറാക്കുന്നു (മാക്സിമം 60 സെക്കൻഡ് കാത്തിരിക്കും)...")
-            # Gemini-ക്ക് 60 സെക്കൻഡ് സമയം നൽകുന്നു
+            print(f"\n{model} ഉപയോഗിച്ച് പോസ്റ്റ് തയ്യാറാക്കുന്നു...")
             response = requests.post(url, headers=headers, json=data, timeout=60)
             result = response.json()
             if 'candidates' in result:
@@ -130,13 +132,13 @@ def add_text_to_image(image, text):
     return image_path
 
 def post_to_facebook(image_path, caption):
-    print("ഫേസ്ബുക്കിലേക്ക് പോസ്റ്റ് ചെയ്യുന്നു (മാക്സിമം 60 സെക്കൻഡ് കാത്തിരിക്കും)...")
+    print("ഫേസ്ബുക്കിലേക്ക് പോസ്റ്റ് ചെയ്യുന്നു...")
+    # ഇവിടെ നമ്മൾ User Token മാറ്റി Page Token ആക്കിയതുകൊണ്ട് 'me' എന്ന് കൊടുത്തത് കൃത്യമായി വർക്ക് ചെയ്യും!
     url = "https://graph.facebook.com/v18.0/me/photos"
     payload = {'caption': caption, 'access_token': FB_PAGE_ACCESS_TOKEN}
     files = {'source': open(image_path, 'rb')}
     
     try:
-        # ഫേസ്ബുക്കിന് 60 സെക്കൻഡ് സമയം നൽകുന്നു
         response = requests.post(url, data=payload, files=files, timeout=60)
         return response.json()
     except Exception as e:
