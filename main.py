@@ -28,46 +28,34 @@ def get_trending_topic():
         print("Trending Fetch Error:", e)
         return "ഇന്നത്തെ പ്രധാന സോഷ്യൽ മീഡിയ ട്രെൻഡിങ് വിവാദം"
 
-def get_working_model():
+def get_available_models():
     print("\nനിങ്ങളുടെ അക്കൗണ്ടിൽ ലഭ്യമായ AI മോഡലുകൾ തിരയുന്നു...")
     url = f"https://generativelanguage.googleapis.com/v1beta/models?key={GEMINI_API_KEY}"
+    available_models = []
     try:
         response = requests.get(url)
         data = response.json()
-        
         if 'models' in data:
-            available_models = []
             for m in data['models']:
                 if 'generateContent' in m.get('supportedGenerationMethods', []):
-                    model_name = m['name'].split('/')[-1]
-                    available_models.append(model_name)
-                    
-            print(f"നിങ്ങളുടെ API Key-ക്ക് ലഭ്യമായ മോഡലുകൾ: {available_models}")
-            
-            # ഏറ്റവും പുതിയ gemini-3.8-flash മോഡലിന് മുൻഗണന നൽകുന്നു
-            for pref in ['gemini-3.8-flash', 'gemini-4-argon', 'gemini-4-carbon', 'gemini-3.8-flash-lite']:
-                if pref in available_models:
-                    print(f"തിരഞ്ഞെടുത്ത മോഡൽ: {pref}")
-                    return pref
-                    
-            if available_models:
-                print(f"തിരഞ്ഞെടുത്ത മോഡൽ: {available_models[0]}")
-                return available_models[0]
-        else:
-            print("മോഡലുകൾ കണ്ടെത്താനായില്ല. ഗൂഗിൾ നൽകിയ എറർ:", data)
+                    available_models.append(m['name'].split('/')[-1])
     except Exception as e:
         print("Model Fetch Error:", e)
-    return None
+    return available_models
 
 def get_post_content(topic):
-    model = get_working_model()
-    
-    if not model:
-        print("API Key പ്രശ്നം: പോസ്റ്റ് തയ്യാറാക്കാൻ ഒരു മോഡലും ലഭ്യമായില്ല.")
+    available_models = get_available_models()
+    if not available_models:
+        print("API Key പ്രശ്നം: മോഡലുകൾ ലഭ്യമായില്ല.")
         return None, None, None
-        
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={GEMINI_API_KEY}"
+
+    # ഗൂഗിൾ സെർവറുകൾ തിരക്കാണെങ്കിൽ മാറിമാറി പരീക്ഷിക്കാനുള്ള മുൻഗണനാ ലിസ്റ്റ്
+    preferences = ['gemini-3.8-flash', 'gemini-3.7-flash', 'gemini-4-argon', 'gemini-3.8-flash-lite', 'gemini-3.6-flash']
     
+    models_to_try = [m for m in preferences if m in available_models]
+    if not models_to_try:
+        models_to_try = available_models[:3] 
+        
     prompt = f"""
     വിഷയം: '{topic}'
     ഈ വിഷയത്തെ അടിസ്ഥാനമാക്കി താഴെ പറയുന്ന 3 കാര്യങ്ങൾ തയ്യാറാക്കുക. 
@@ -75,26 +63,32 @@ def get_post_content(topic):
     
     ഫോർമാറ്റ്: [ചിത്രത്തിൽ എഴുതാനുള്ള വായനക്കാരെ ചിന്തിപ്പിക്കുന്ന ഒരു വരി മലയാളം ചോദ്യം] | [ഫേസ്ബുക്കിൽ ഇടാനുള്ള വിമർശനാത്മകമായ മലയാളം ക്യാപ്ഷൻ (ഹാഷ്‌ടാഗ് അടക്കം)] | [High quality, watermark free ഫോട്ടോ ഇന്റർനെറ്റിൽ തിരയാനുള്ള 2-3 ഇംഗ്ലീഷ് വാക്കുകൾ]
     """
-    
     headers = {'Content-Type': 'application/json'}
     data = {"contents": [{"parts": [{"text": prompt}]}]}
     
-    try:
-        print(f"\n{model} ഉപയോഗിച്ച് പോസ്റ്റ് തയ്യാറാക്കുന്നു...")
-        response = requests.post(url, headers=headers, json=data)
-        result = response.json()
-        
-        if 'candidates' in result:
-            text = result['candidates'][0]['content']['parts'][0]['text']
-            parts = text.strip().split('|')
-            if len(parts) >= 3:
-                return parts[0].strip(), parts[1].strip(), parts[2].strip()
-        else:
-            print("Gemini API നൽകിയ എറർ:", result)
+    # ഒരു മോഡൽ തിരക്കാണെങ്കിൽ അടുത്തത് എടുക്കാൻ വേണ്ടി Loop ഉപയോഗിക്കുന്നു
+    for model in models_to_try:
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={GEMINI_API_KEY}"
+        try:
+            print(f"\n{model} ഉപയോഗിച്ച് പോസ്റ്റ് തയ്യാറാക്കാൻ ശ്രമിക്കുന്നു...")
+            response = requests.post(url, headers=headers, json=data)
+            result = response.json()
             
-    except Exception as e:
-        print("Gemini കണക്ഷൻ പരാജയപ്പെട്ടു:", e)
-        
+            if 'candidates' in result:
+                text = result['candidates'][0]['content']['parts'][0]['text']
+                parts = text.strip().split('|')
+                if len(parts) >= 3:
+                    return parts[0].strip(), parts[1].strip(), parts[2].strip()
+            else:
+                error_msg = result.get('error', {}).get('message', 'Unknown Error')
+                print(f"പരാജയപ്പെട്ടു! കാരണം: {error_msg}")
+                print("സെർവർ തിരക്കായതിനാൽ അടുത്ത മോഡലിലേക്ക് മാറുന്നു...")
+                # തിരക്കാണെങ്കിൽ ലൂപ്പ് അടുത്ത മോഡലിലേക്ക് തനിയെ പോകും
+                
+        except Exception as e:
+            print(f"കണക്ഷൻ എറർ: {e}")
+            
+    print("\nഎല്ലാ മോഡലുകളും പരാജയപ്പെട്ടു. പിന്നീട് വീണ്ടും ശ്രമിക്കുക.")
     return None, None, None
 
 def fetch_image(query):
