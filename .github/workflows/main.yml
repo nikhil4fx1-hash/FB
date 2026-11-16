@@ -1,0 +1,34 @@
+name: Auto Facebook Post
+
+on:
+  schedule:
+    # ഇന്ത്യൻ സമയം രാവിലെ 9:00, ഉച്ചയ്ക്ക് 1:00, വൈകിട്ട് 5:00, രാത്രി 8:00
+    - cron: '00 2 * * *'
+    - cron: '30 7 * * *'
+    - cron: '30 12 * * *'
+    - cron: '30 15 * * *'
+  workflow_dispatch: # നമുക്ക് എപ്പോൾ വേണമെങ്കിലും മാന്വൽ ആയി റൺ ചെയ്യാൻ
+
+jobs:
+  post_to_fb:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout Repository
+      uses: actions/checkout@v3
+
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.10'
+
+    - name: Install Dependencies
+      run: |
+        pip install -r requirements.txt
+
+    - name: Run Python Script
+      env:
+        GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+        FB_PAGE_ACCESS_TOKEN: ${{ secrets.FB_PAGE_ACCESS_TOKEN }}
+        FB_PAGE_ID: ${{ secrets.FB_PAGE_ID }}
+      run: python main.py
