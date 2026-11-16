@@ -2,6 +2,7 @@ import requests
 import feedparser
 import random
 import os
+import urllib.parse
 from PIL import Image, ImageDraw, ImageFont
 from io import BytesIO
 
@@ -11,7 +12,22 @@ FB_PAGE_ACCESS_TOKEN = os.environ.get("FB_PAGE_ACCESS_TOKEN")
 # =================================================
 
 def get_trending_topic():
-    rss_url = "https://news.google.com/rss?hl=ml&gl=IN&ceid=IN:ml"
+    # ആളുകൾ കൂടുതൽ പ്രതികരിക്കുന്ന വിഷയങ്ങൾ (Hot Topics)
+    hot_keywords = [
+        "സഞ്ജു സാംസൺ", "Sanju Samson cricket", "ഇന്ത്യൻ ക്രിക്കറ്റ്",
+        "കേരള രാഷ്ട്രീയം", "പിണറായി വിജയൻ", "നരേന്ദ്ര മോദി", 
+        "ബിജെപി", "കോൺഗ്രസ്", "സിപിഎം", "മാർക്സിസ്റ്റ് പാർട്ടി", "ലോക്സഭാ തിരഞ്ഞെടുപ്പ്"
+    ]
+    
+    # 85% സമയത്തും ഈ ഹോട്ട് ടോപ്പിക്കുകൾ തന്നെ സെർച്ച് ചെയ്ത് എടുക്കും (കൂടുതൽ റീച്ചിന് വേണ്ടി)
+    if random.random() < 0.85:
+        keyword = random.choice(hot_keywords)
+        encoded_keyword = urllib.parse.quote(keyword)
+        rss_url = f"https://news.google.com/rss/search?q={encoded_keyword}&hl=ml&gl=IN&ceid=IN:ml"
+    else:
+        # ബാക്കി 15% സമയം പൊതുവായ ട്രെൻഡിങ് വാർത്തകൾ എടുക്കും
+        rss_url = "https://news.google.com/rss?hl=ml&gl=IN&ceid=IN:ml"
+        
     try:
         headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'}
         response = requests.get(rss_url, headers=headers, timeout=30)
@@ -21,10 +37,10 @@ def get_trending_topic():
             entry = random.choice(feed.entries[:5])
             return f"Topic: {entry.title}"
         else:
-            return "ഇന്ത്യയിലെ ഇന്നത്തെ പ്രധാന രാഷ്ട്രീയ അല്ലെങ്കിൽ കായിക ചർച്ചാവിഷയം"
+            return "സഞ്ജു സാംസണും ബിസിസിഐയും അല്ലെങ്കിൽ ഇന്നത്തെ പ്രധാന രാഷ്ട്രീയ ചർച്ചാവിഷയം"
     except Exception as e:
         print("Trending Fetch Error:", e)
-        return "ഇന്നത്തെ പ്രധാന സോഷ്യൽ മീഡിയ ട്രെൻഡിങ് വിവാദം"
+        return "സഞ്ജു സാംസണും ബിസിസിഐയും അല്ലെങ്കിൽ ഇന്നത്തെ പ്രധാന രാഷ്ട്രീയ ചർച്ചാവിഷയം"
 
 def get_available_models():
     url = f"https://generativelanguage.googleapis.com/v1beta/models?key={GEMINI_API_KEY}"
@@ -51,12 +67,13 @@ def get_post_content(topic):
         if m not in models_to_try:
             models_to_try.append(m)
             
+    # AI-ക്കുള്ള നിർദ്ദേശം കൂടുതൽ എന്റർടെയ്‌നിങ്ങും കമന്റുകൾ വരുന്ന രീതിയിലും ആക്കി മാറ്റി
     prompt = f"""
     വിഷയം: '{topic}'
     ഈ വിഷയത്തെ അടിസ്ഥാനമാക്കി താഴെ പറയുന്ന 3 കാര്യങ്ങൾ തയ്യാറാക്കുക. 
     മറുപടി കൃത്യമായി '|' ഉപയോഗിച്ച് വേർതിരിച്ചിരിക്കണം. വേറെ ഒന്നും എഴുതരുത്.
     
-    ഫോർമാറ്റ്: [ചിത്രത്തിൽ എഴുതാനുള്ള വായനക്കാരെ ചിന്തിപ്പിക്കുന്ന ഒരു വരി മലയാളം ചോദ്യം] | [ഫേസ്ബുക്കിൽ ഇടാനുള്ള വിമർശനാത്മകമായ മലയാളം ക്യാപ്ഷൻ (ഹാഷ്‌ടാഗ് അടക്കം)] | [High quality, watermark free ഫോട്ടോ ഇന്റർനെറ്റിൽ തിരയാനുള്ള 2-3 ഇംഗ്ലീഷ് വാക്കുകൾ]
+    ഫോർമാറ്റ്: [ചിത്രത്തിൽ എഴുതാനുള്ള വായനക്കാരെ പ്രകോപിപ്പിക്കുന്നതോ അല്ലെങ്കിൽ അവരോട് അഭിപ്രായം ചോദിക്കുന്നതോ ആയ ഒരു കിടിലൻ മലയാളം ചോദ്യം] | [ഫേസ്ബുക്കിൽ ഇടാനുള്ള ആളുകളെക്കൊണ്ട് നിർബന്ധമായും കമന്റ് ചെയ്യിപ്പിക്കുന്ന തരത്തിലുള്ള ആവേശകരമായ മലയാളം ക്യാപ്ഷൻ (ഹാഷ്‌ടാഗ് അടക്കം)] | [High quality, watermark free ഫോട്ടോ ഇന്റർനെറ്റിൽ തിരയാനുള്ള 2-3 ഇംഗ്ലീഷ് വാക്കുകൾ]
     """
     headers = {'Content-Type': 'application/json'}
     data = {"contents": [{"parts": [{"text": prompt}]}]}
@@ -114,7 +131,6 @@ def add_text_to_image(image, text):
     draw = ImageDraw.Draw(image)
     
     try:
-        # ഫോണ്ട് സൈസ് അല്പം കുറച്ചു (ചെറുതായി കാണാൻ)
         font = ImageFont.truetype("Manjari-Bold.ttf", int(width/20))
     except:
         font = ImageFont.load_default()
@@ -122,7 +138,6 @@ def add_text_to_image(image, text):
     margin = 40
     max_width = width - (margin * 2)
     
-    # വരികൾ മുറിക്കുന്നതിനുള്ള ലോജിക് (Text Wrapping)
     words = text.split(' ')
     lines = []
     current_line = []
@@ -146,7 +161,6 @@ def add_text_to_image(image, text):
     if current_line:
         lines.append(" ".join(current_line))
         
-    # വരികളുടെ എണ്ണം അനുസരിച്ച് ഉയരം കൂട്ടുന്നു
     try:
         line_height = draw.textbbox((0, 0), "ക്യ", font=font)[3] - draw.textbbox((0, 0), "ക്യ", font=font)[1]
     except:
@@ -157,10 +171,8 @@ def add_text_to_image(image, text):
     
     box_top = height - total_text_height - 60
     
-    # പിന്നിലെ കറുപ്പ് ബോക്സ്
     draw.rectangle(((0, box_top), (width, height)), fill=(0, 0, 0, 200))
     
-    # ടെക്സ്റ്റ് മധ്യഭാഗത്തായി (Center Align) എഴുതുന്നു
     y_text = box_top + 30
     for line in lines:
         try:
