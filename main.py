@@ -13,7 +13,6 @@ FB_PAGE_ID = os.environ.get("FB_PAGE_ID")
 # =================================================
 
 def get_trending_topic():
-    # ഗൂഗിൾ ന്യൂസ് (മലയാളം) പ്രധാന വാർത്തകൾ 
     rss_url = "https://news.google.com/rss?hl=ml&gl=IN&ceid=IN:ml"
     try:
         headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'}
@@ -29,7 +28,48 @@ def get_trending_topic():
         print("Trending Fetch Error:", e)
         return "ഇന്നത്തെ പ്രധാന സോഷ്യൽ മീഡിയ ട്രെൻഡിങ് വിവാദം"
 
+def get_working_model():
+    print("\nനിങ്ങളുടെ അക്കൗണ്ടിൽ ലഭ്യമായ AI മോഡലുകൾ തിരയുന്നു...")
+    url = f"https://generativelanguage.googleapis.com/v1beta/models?key={GEMINI_API_KEY}"
+    try:
+        response = requests.get(url)
+        data = response.json()
+        
+        if 'models' in data:
+            available_models = []
+            for m in data['models']:
+                # കണ്ടന്റ് ജനറേറ്റ് ചെയ്യാൻ പറ്റുന്ന മോഡലുകൾ മാത്രം വേർതിരിക്കുന്നു
+                if 'generateContent' in m.get('supportedGenerationMethods', []):
+                    model_name = m['name'].split('/')[-1]
+                    available_models.append(model_name)
+                    
+            print(f"നിങ്ങളുടെ API Key-ക്ക് ലഭ്യമായ മോഡലുകൾ: {available_models}")
+            
+            # ലഭ്യമായതിൽ നിന്നും ഏറ്റവും മികച്ചത് തനിയെ തിരഞ്ഞെടുക്കുന്നു
+            for pref in ['gemini-1.5-flash', 'gemini-1.5-pro', 'gemini-pro', 'gemini-1.0-pro']:
+                if pref in available_models:
+                    print(f"തിരഞ്ഞെടുത്ത മോഡൽ: {pref}")
+                    return pref
+                    
+            if available_models:
+                print(f"തിരഞ്ഞെടുത്ത മോഡൽ: {available_models[0]}")
+                return available_models[0]
+        else:
+            print("മോഡലുകൾ കണ്ടെത്താനായില്ല. ഗൂഗിൾ നൽകിയ എറർ:", data)
+    except Exception as e:
+        print("Model Fetch Error:", e)
+    return None
+
 def get_post_content(topic):
+    # വർക്ക് ആകുന്ന മോഡൽ ആദ്യം കണ്ടെത്തുന്നു
+    model = get_working_model()
+    
+    if not model:
+        print("API Key പ്രശ്നം: പോസ്റ്റ് തയ്യാറാക്കാൻ ഒരു മോഡലും ലഭ്യമായില്ല.")
+        return None, None, None
+        
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={GEMINI_API_KEY}"
+    
     prompt = f"""
     വിഷയം: '{topic}'
     ഈ വിഷയത്തെ അടിസ്ഥാനമാക്കി താഴെ പറയുന്ന 3 കാര്യങ്ങൾ തയ്യാറാക്കുക. 
@@ -41,31 +81,25 @@ def get_post_content(topic):
     headers = {'Content-Type': 'application/json'}
     data = {"contents": [{"parts": [{"text": prompt}]}]}
     
-    # 3 വ്യത്യസ്ത മോഡലുകൾ നൽകുന്നു. ഒരെണ്ണം പരാജയപ്പെട്ടാൽ അടുത്തത് എടുക്കും.
-    models = ['gemini-1.5-flash', 'gemini-1.5-flash-latest', 'gemini-pro']
-    
-    for model in models:
-        url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={GEMINI_API_KEY}"
-        try:
-            print(f"Trying {model}...")
-            response = requests.post(url, headers=headers, json=data)
-            result = response.json()
+    try:
+        print(f"\n{model} ഉപയോഗിച്ച് പോസ്റ്റ് തയ്യാറാക്കുന്നു...")
+        response = requests.post(url, headers=headers, json=data)
+        result = response.json()
+        
+        if 'candidates' in result:
+            text = result['candidates'][0]['content']['parts'][0]['text']
+            parts = text.strip().split('|')
+            if len(parts) >= 3:
+                return parts[0].strip(), parts[1].strip(), parts[2].strip()
+        else:
+            print("Gemini API നൽകിയ എറർ:", result)
             
-            if 'candidates' in result:
-                text = result['candidates'][0]['content']['parts'][0]['text']
-                parts = text.strip().split('|')
-                if len(parts) >= 3:
-                    return parts[0].strip(), parts[1].strip(), parts[2].strip()
-            else:
-                print(f"{model} പരാജയപ്പെട്ടു. കാരണം: {result.get('error', {}).get('message', 'Unknown Error')}")
-                
-        except Exception as e:
-            print(f"Error with {model}: {e}")
-            
+    except Exception as e:
+        print("Gemini കണക്ഷൻ പരാജയപ്പെട്ടു:", e)
+        
     return None, None, None
 
 def fetch_image(query):
-    # API ഇല്ലാതെ DuckDuckGo വഴി ഫ്രീയായി ഫോട്ടോ എടുക്കുന്നു
     try:
         results = DDGS().images(query, max_results=1)
         if results:
@@ -82,14 +116,11 @@ def add_text_to_image(image, text):
     width, height = image.size
     draw = ImageDraw.Draw(image)
     
-    # മലയാളം ഫോണ്ട് (Manjari-Bold.ttf ഫയൽ റെപ്പോസിറ്ററിയിൽ ഉണ്ടെന്ന് ഉറപ്പാക്കുക)
     try:
         font = ImageFont.truetype("Manjari-Bold.ttf", int(width/15))
     except:
         font = ImageFont.load_default()
-        print("ഫോണ്ട് കണ്ടെത്താനായില്ല!")
         
-    # ഷാഡോ ബോക്സും മഞ്ഞ നിറത്തിൽ അക്ഷരങ്ങളും
     draw.rectangle(((0, height - int(height/5)), (width, height)), fill=(0, 0, 0, 200))
     draw.text((20, height - int(height/6)), text, font=font, fill="yellow")
     
@@ -107,13 +138,12 @@ def post_to_facebook(image_path, caption):
 def main():
     print("ട്രെൻഡിങ് വിഷയം തിരയുന്നു...")
     topic = get_trending_topic()
-    print(f"കണ്ടെത്തിയ വിഷയം: {topic}\n")
+    print(f"കണ്ടെത്തിയ വിഷയം: {topic}")
     
-    print("Gemini വഴി പോസ്റ്റ് തയ്യാറാക്കുന്നു...")
     image_text, caption, search_query = get_post_content(topic)
     
     if image_text and caption and search_query:
-        print(f"ചോദ്യം: {image_text}\nക്യാപ്ഷൻ: {caption}\nസെർച്ച് കീവേർഡ്: {search_query}\n")
+        print(f"\nചോദ്യം: {image_text}\nക്യാപ്ഷൻ: {caption}\nസെർച്ച് കീവേർഡ്: {search_query}\n")
         
         print("ഫോട്ടോ ഡൗൺലോഡ് ചെയ്യുന്നു...")
         img = fetch_image(search_query)
