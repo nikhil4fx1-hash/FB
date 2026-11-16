@@ -48,7 +48,6 @@ def get_post_content(topic):
         print("API Key പ്രശ്നം: മോഡലുകൾ ലഭ്യമായില്ല.")
         return None, None, None
 
-    # ഗൂഗിൾ സെർവറുകൾ തിരക്കാണെങ്കിൽ മാറിമാറി പരീക്ഷിക്കാനുള്ള മുൻഗണനാ ലിസ്റ്റ്
     preferences = ['gemini-3.8-flash', 'gemini-3.7-flash', 'gemini-4-argon', 'gemini-3.8-flash-lite', 'gemini-3.6-flash']
     
     models_to_try = [m for m in preferences if m in available_models]
@@ -89,31 +88,40 @@ def get_post_content(topic):
     return None, None, None
 
 def fetch_image(query):
-    # സ്റ്റെപ്പ് 1: പുതിയ ലൈബ്രറി ഉപയോഗിച്ച് DuckDuckGo-ൽ ശ്രമിക്കുന്നു
+    # സ്റ്റെപ്പ് 1: DuckDuckGo
     print("DuckDuckGo വഴി ഫോട്ടോ എടുക്കാൻ ശ്രമിക്കുന്നു...")
     try:
         from ddgs import DDGS
         results = DDGS().images(query, max_results=1)
         if results:
             img_url = results[0]['image']
-            headers = {'User-Agent': 'Mozilla/5.0'}
-            img_data = requests.get(img_url, headers=headers, timeout=10).content
-            return Image.open(BytesIO(img_data))
+            headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'}
+            response = requests.get(img_url, headers=headers, timeout=10)
+            
+            # ലഭിച്ചത് യഥാർത്ഥ ഫോട്ടോ ആണെന്ന് ഉറപ്പുവരുത്തുന്നു
+            if response.status_code == 200 and 'image' in response.headers.get('Content-Type', ''):
+                return Image.open(BytesIO(response.content))
+            else:
+                print("DuckDuckGo ഫോട്ടോ ഡൗൺലോഡ് ചെയ്യാൻ അനുവദിച്ചില്ല.")
     except Exception as e:
-        print(f"DuckDuckGo പരാജയപ്പെട്ടു (Rate Limit): {e}")
+        print(f"DuckDuckGo പരാജയപ്പെട്ടു: {e}")
 
-    # സ്റ്റെപ്പ് 2: പരാജയപ്പെട്ടാൽ തനിയെ വിക്കിപീഡിയയിൽ നിന്നും ഒറിജിനൽ ഫോട്ടോ എടുക്കുന്നു
+    # സ്റ്റെപ്പ് 2: Wikipedia Fallback (User-Agent ചേർത്ത്)
     print("വിക്കിപീഡിയ വഴി ഫോട്ടോ എടുക്കാൻ ശ്രമിക്കുന്നു (Fallback)...")
     try:
-        search_term = " ".join(query.split()[:2]) # കൂടുതൽ കൃത്യതയ്ക്ക് ആദ്യത്തെ 2 വാക്കുകൾ എടുക്കുന്നു
+        search_term = " ".join(query.split()[:2]) 
         url = f"https://en.wikipedia.org/w/api.php?action=query&format=json&prop=pageimages&generator=search&gsrsearch={search_term}&gsrlimit=1&pithumbsize=1000"
-        res = requests.get(url, timeout=10).json()
+        
+        # വിക്കിപീഡിയ ബ്ലോക്ക് ചെയ്യാതിരിക്കാൻ കൃത്യമായ User-Agent നൽകുന്നു
+        headers = {'User-Agent': 'AutoFBPostBot/1.0 (nikhiltk4u@gmail.com)'}
+        res = requests.get(url, headers=headers, timeout=10).json()
+        
         pages = res.get('query', {}).get('pages', {})
         if pages:
             for page_id in pages:
                 img_url = pages[page_id].get('thumbnail', {}).get('source')
                 if img_url:
-                    img_data = requests.get(img_url, timeout=10).content
+                    img_data = requests.get(img_url, headers=headers, timeout=10).content
                     return Image.open(BytesIO(img_data))
     except Exception as e:
         print("Wikipedia Fetch Error:", e)
