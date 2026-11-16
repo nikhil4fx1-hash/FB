@@ -30,9 +30,6 @@ def get_trending_topic():
         return "ഇന്നത്തെ പ്രധാന സോഷ്യൽ മീഡിയ ട്രെൻഡിങ് വിവാദം"
 
 def get_post_content(topic):
-    # ലൈബ്രറി ഇല്ലാതെ നേരിട്ടുള്ള സുരക്ഷിതമായ API കോൾ (REST API)
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={GEMINI_API_KEY}"
-    
     prompt = f"""
     വിഷയം: '{topic}'
     ഈ വിഷയത്തെ അടിസ്ഥാനമാക്കി താഴെ പറയുന്ന 3 കാര്യങ്ങൾ തയ്യാറാക്കുക. 
@@ -44,21 +41,27 @@ def get_post_content(topic):
     headers = {'Content-Type': 'application/json'}
     data = {"contents": [{"parts": [{"text": prompt}]}]}
     
-    try:
-        response = requests.post(url, headers=headers, json=data)
-        result = response.json()
-        
-        if 'candidates' in result:
-            text = result['candidates'][0]['content']['parts'][0]['text']
-            parts = text.strip().split('|')
-            if len(parts) >= 3:
-                return parts[0].strip(), parts[1].strip(), parts[2].strip()
-        else:
-            print("Gemini API നൽകിയ എറർ:", result)
+    # 3 വ്യത്യസ്ത മോഡലുകൾ നൽകുന്നു. ഒരെണ്ണം പരാജയപ്പെട്ടാൽ അടുത്തത് എടുക്കും.
+    models = ['gemini-1.5-flash', 'gemini-1.5-flash-latest', 'gemini-pro']
+    
+    for model in models:
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={GEMINI_API_KEY}"
+        try:
+            print(f"Trying {model}...")
+            response = requests.post(url, headers=headers, json=data)
+            result = response.json()
             
-    except Exception as e:
-        print("Gemini കണക്ഷൻ പരാജയപ്പെട്ടു:", e)
-        
+            if 'candidates' in result:
+                text = result['candidates'][0]['content']['parts'][0]['text']
+                parts = text.strip().split('|')
+                if len(parts) >= 3:
+                    return parts[0].strip(), parts[1].strip(), parts[2].strip()
+            else:
+                print(f"{model} പരാജയപ്പെട്ടു. കാരണം: {result.get('error', {}).get('message', 'Unknown Error')}")
+                
+        except Exception as e:
+            print(f"Error with {model}: {e}")
+            
     return None, None, None
 
 def fetch_image(query):
