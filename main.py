@@ -1,7 +1,6 @@
 import requests
 import feedparser
 import os
-import urllib.request
 from PIL import Image, ImageDraw, ImageFont
 from io import BytesIO
 
@@ -11,7 +10,6 @@ FB_PAGE_ACCESS_TOKEN = os.environ.get("FB_PAGE_ACCESS_TOKEN")
 # =================================================
 
 def get_trending_topics():
-    # ഗൂഗിൾ ന്യൂസിൽ നിന്നുള്ള യഥാർത്ഥ റിയൽ-ടൈം വാർത്തകൾ എടുക്കുന്നു
     rss_url = "https://news.google.com/rss?hl=ml&gl=IN&ceid=IN:ml"
     try:
         headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'}
@@ -19,7 +17,6 @@ def get_trending_topics():
         feed = feedparser.parse(response.content)
         
         if feed.entries:
-            # ഏറ്റവും പുതിയ 15 വാർത്തകളുടെ തലക്കെട്ടുകൾ AI-ക്ക് കൊടുക്കാൻ എടുക്കുന്നു
             titles = [entry.title for entry in feed.entries[:15]]
             return "\n".join(titles)
         else:
@@ -53,16 +50,18 @@ def get_post_content(topics_list):
         if m not in models_to_try:
             models_to_try.append(m)
             
-    # AI-ക്കുള്ള നിർദ്ദേശം: ലിസ്റ്റിൽ നിന്ന് ഏറ്റവും ചൂടേറിയ വാർത്ത മാത്രം എടുക്കാൻ
     prompt = f"""
     താഴെ ഇന്നത്തെ പ്രധാന വാർത്തകളുടെ തലക്കെട്ടുകൾ നൽകിയിരിക്കുന്നു:
-    
     {topics_list}
     
-    ഇതിൽ നിന്നും ആളുകൾ ഏറ്റവും കൂടുതൽ ചർച്ച ചെയ്യാൻ സാധ്യതയുള്ള, ഏറ്റവും 'Trending' ആയ ഒരു വാർത്ത മാത്രം തിരഞ്ഞെടുക്കുക (ഉദാഹരണത്തിന്: സ്വർണ്ണവില ഇടിഞ്ഞത്, ധോണിയുടെ വിരമിക്കൽ പോലെയുള്ളവ). ആ തിരഞ്ഞെടുത്ത വാർത്തയെ അടിസ്ഥാനമാക്കി താഴെ പറയുന്ന 3 കാര്യങ്ങൾ തയ്യാറാക്കുക. മറുപടി കൃത്യമായി '|' ഉപയോഗിച്ച് വേർതിരിച്ചിരിക്കണം.
+    ഇതിൽ നിന്നും ആളുകൾ ഏറ്റവും കൂടുതൽ ചർച്ച ചെയ്യാൻ സാധ്യതയുള്ള, ഏറ്റവും 'Trending' ആയ ഒരു വാർത്ത മാത്രം തിരഞ്ഞെടുക്കുക (ഉദാഹരണത്തിന്: സ്വർണ്ണവില ഇടിഞ്ഞത്, ധോണിയുടെ വിരമിക്കൽ പോലെയുള്ളവ). 
     
-    ഫോർമാറ്റ്: [ചിത്രത്തിൽ എഴുതാനുള്ള വായനക്കാരെ ചിന്തിപ്പിക്കുന്നതോ ആകർഷിക്കുന്നതോ ആയ ഒരു വരി മലയാളം (വളരെ നീളം കൂടരുത്)] | [ഫേസ്ബുക്കിൽ ഇടാനുള്ള ആളുകളെക്കൊണ്ട് കമന്റ് ചെയ്യിപ്പിക്കുന്ന തരത്തിലുള്ള കിടിലൻ മലയാളം ക്യാപ്ഷൻ (ഹാഷ്‌ടാഗ് അടക്കം)] | [High Quality HD ഫോട്ടോ ഇന്റർനെറ്റിൽ തിരയാനുള്ള 3-4 ഇംഗ്ലീഷ് വാക്കുകൾ]
+    ഈ വാർത്തയെ അടിസ്ഥാനമാക്കി താഴെ പറയുന്ന 3 കാര്യങ്ങൾ മാത്രം കൃത്യമായി '|' ഉപയോഗിച്ച് വേർതിരിച്ച് നൽകുക. ബ്രാക്കറ്റുകളോ മറ്റ് ചിഹ്നങ്ങളോ ഉപയോഗിക്കരുത്.
+    
+    മാതൃക (ഈ രീതിയിൽ മാത്രം മറുപടി നൽകുക):
+    ഇവിടെ ചിത്രത്തിൽ എഴുതാനുള്ള ഒരു വരി മലയാളം ചോദ്യം വരണം | ഇവിടെ ഫേസ്ബുക്കിൽ ഇടാനുള്ള കിടിലൻ മലയാളം ക്യാപ്ഷനും ഹാഷ്‌ടാഗുകളും വരണം | ഇവിടെ ഫോട്ടോ ഇന്റർനെറ്റിൽ തിരയാനുള്ള 2 ഇംഗ്ലീഷ് വാക്കുകൾ വരണം
     """
+    
     headers = {'Content-Type': 'application/json'}
     data = {"contents": [{"parts": [{"text": prompt}]}]}
     
@@ -74,7 +73,8 @@ def get_post_content(topics_list):
             result = response.json()
             if 'candidates' in result:
                 text = result['candidates'][0]['content']['parts'][0]['text']
-                parts = text.strip().split('|')
+                text = text.replace("[", "").replace("]", "").replace("Caption:", "").replace("Query:", "").strip()
+                parts = text.split('|')
                 if len(parts) >= 3:
                     return parts[0].strip(), parts[1].strip(), parts[2].strip()
         except Exception as e:
@@ -83,36 +83,35 @@ def get_post_content(topics_list):
     return None, None, None
 
 def fetch_image(query):
-    # HD ഫോട്ടോ ലഭിക്കാൻ ക്വറിയിൽ HD എന്ന് ചേർക്കുന്നു
-    hd_query = query + " high resolution HD"
+    print(f"തിരയുന്ന ഫോട്ടോ: {query}")
     try:
         from ddgs import DDGS
-        results = DDGS().images(hd_query, max_results=1)
-        if results:
-            img_url = results[0]['image']
+        results = DDGS().images(query, max_results=3)
+        for res in results:
+            img_url = res['image']
             headers = {'User-Agent': 'Mozilla/5.0'}
-            response = requests.get(img_url, headers=headers, timeout=30)
+            response = requests.get(img_url, headers=headers, timeout=20)
             if response.status_code == 200 and 'image' in response.headers.get('Content-Type', ''):
                 return Image.open(BytesIO(response.content))
-    except:
-        pass
+    except Exception as e:
+        print("DuckDuckGo Image Error:", e)
 
     try:
         search_term = " ".join(query.split()[:2]) 
-        url = f"https://en.wikipedia.org/w/api.php?action=query&format=json&prop=pageimages&generator=search&gsrsearch={search_term}&gsrlimit=1&pithumbsize=1000"
+        url = f"https://en.wikipedia.org/w/api.php?action=query&format=json&prop=pageimages&generator=search&gsrsearch={search_term}&gsrlimit=3&pithumbsize=1000"
         headers = {'User-Agent': 'AutoFBPostBot/1.0'}
-        res = requests.get(url, headers=headers, timeout=30).json()
+        res = requests.get(url, headers=headers, timeout=20).json()
         pages = res.get('query', {}).get('pages', {})
         if pages:
             for page_id in pages:
                 img_url = pages[page_id].get('thumbnail', {}).get('source')
                 if img_url:
-                    img_data = requests.get(img_url, headers=headers, timeout=30).content
+                    img_data = requests.get(img_url, headers=headers, timeout=20).content
                     return Image.open(BytesIO(img_data))
-    except:
-        pass
+    except Exception as e:
+        print("Wiki Image Error:", e)
         
-    img = Image.new('RGB', (1080, 1080), color=(20, 24, 33))
+    img = Image.new('RGB', (1080, 1080), color=(40, 44, 52))
     return img
 
 def add_text_to_image(image, text):
@@ -120,19 +119,14 @@ def add_text_to_image(image, text):
     width, height = image.size
     draw = ImageDraw.Draw(image)
     
-    # സ്റ്റൈലിഷ് ആയ Noto Sans Bold മലയാളം ഫോണ്ട് ഡൗൺലോഡ് ചെയ്യുന്നു
-    font_path = "NotoSansMalayalam-Bold.ttf"
-    if not os.path.exists(font_path):
-        try:
-            print("സ്റ്റൈലിഷ് ഫോണ്ട് ഡൗൺലോഡ് ചെയ്യുന്നു...")
-            font_url = "https://github.com/googlefonts/noto-fonts/raw/main/unhinted/ttf/NotoSansMalayalam/NotoSansMalayalam-Bold.ttf"
-            urllib.request.urlretrieve(font_url, font_path)
-        except:
-            pass
+    # ഗിറ്റ്ഹബ്ബിൽ നേരിട്ട് അപ്‌ലോഡ് ചെയ്ത ഫോണ്ട് ഫയൽ ഉപയോഗിക്കുന്നു
+    font_path = "MalayalamFont.ttf"
             
     try:
         font = ImageFont.truetype(font_path, int(width/16))
-    except:
+    except Exception as e:
+        print("മുന്നറിയിപ്പ്: മലയാളം ഫോണ്ട് ഗിറ്റ്ഹബ്ബിൽ കണ്ടെത്താനായില്ല! ദയവായി 'MalayalamFont.ttf' എന്ന പേരിൽ ഫയൽ അപ്‌ലോഡ് ചെയ്തിട്ടുണ്ടെന്ന് ഉറപ്പാക്കുക.")
+        print("Error:", e)
         font = ImageFont.load_default()
         
     margin = 40
@@ -169,8 +163,6 @@ def add_text_to_image(image, text):
     line_spacing = 15
     total_text_height = (len(lines) * line_height) + ((len(lines) - 1) * line_spacing)
     
-    # കറുത്ത ബാക്ക്ഗ്രൗണ്ട് ബോക്സ് പൂർണ്ണമായും ഒഴിവാക്കി! 
-    # ഫോട്ടോയുടെ താഴെയായി ടെക്സ്റ്റ് വെക്കുന്നു
     y_text = height - total_text_height - 50 
     if y_text < 30: 
         y_text = 30
@@ -184,8 +176,8 @@ def add_text_to_image(image, text):
             
         x_text = (width - text_w) / 2
         
-        # കിടിലൻ സ്റ്റൈൽ: വെളുത്ത അക്ഷരങ്ങൾക്ക് ചുറ്റും കട്ടിയുള്ള കറുത്ത ബോർഡർ നൽകുന്നു (Text Stroke)
-        draw.text((x_text, y_text), line, font=font, fill="#FFFFFF", stroke_width=4, stroke_fill="#000000")
+        # വെള്ള അക്ഷരങ്ങൾക്ക് ചുറ്റും കറുത്ത ബോർഡർ (Outline)
+        draw.text((x_text, y_text), line, font=font, fill="#FFFFFF", stroke_width=5, stroke_fill="#000000")
         y_text += line_height + line_spacing
         
     image_path = "fb_post.jpg"
@@ -193,6 +185,7 @@ def add_text_to_image(image, text):
     return image_path
 
 def post_to_facebook(image_path, caption):
+    print(f"\nക്യാപ്ഷൻ: {caption}")
     print("ഫേസ്ബുക്കിലേക്ക് പോസ്റ്റ് ചെയ്യുന്നു...")
     url = "https://graph.facebook.com/v18.0/me/photos"
     payload = {'caption': caption, 'access_token': FB_PAGE_ACCESS_TOKEN}
@@ -206,13 +199,12 @@ def post_to_facebook(image_path, caption):
 
 def main():
     print("സ്ക്രിപ്റ്റ് തുടങ്ങി...")
-    # യഥാർത്ഥ വാർത്തകൾ എടുക്കുന്നു
     topics_list = get_trending_topics() 
     
     image_text, caption, search_query = get_post_content(topics_list)
     
     if image_text and caption and search_query:
-        print("ഫോട്ടോ ഡൗൺലോഡ് ചെയ്യുന്നു...")
+        print("\nചിത്രത്തിലെ ടെക്സ്റ്റ്:", image_text)
         img = fetch_image(search_query)
         final_img = add_text_to_image(img, image_text)
         res = post_to_facebook(final_img, caption)
