@@ -1,8 +1,7 @@
 import requests
 import feedparser
-import random
 import os
-import urllib.parse
+import urllib.request
 from PIL import Image, ImageDraw, ImageFont
 from io import BytesIO
 
@@ -11,36 +10,23 @@ GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
 FB_PAGE_ACCESS_TOKEN = os.environ.get("FB_PAGE_ACCESS_TOKEN")
 # =================================================
 
-def get_trending_topic():
-    # ആളുകൾ കൂടുതൽ പ്രതികരിക്കുന്ന വിഷയങ്ങൾ (Hot Topics)
-    hot_keywords = [
-        "സഞ്ജു സാംസൺ", "Sanju Samson cricket", "ഇന്ത്യൻ ക്രിക്കറ്റ്",
-        "കേരള രാഷ്ട്രീയം", "പിണറായി വിജയൻ", "നരേന്ദ്ര മോദി", 
-        "ബിജെപി", "കോൺഗ്രസ്", "സിപിഎം", "മാർക്സിസ്റ്റ് പാർട്ടി", "ലോക്സഭാ തിരഞ്ഞെടുപ്പ്"
-    ]
-    
-    # 85% സമയത്തും ഈ ഹോട്ട് ടോപ്പിക്കുകൾ തന്നെ സെർച്ച് ചെയ്ത് എടുക്കും (കൂടുതൽ റീച്ചിന് വേണ്ടി)
-    if random.random() < 0.85:
-        keyword = random.choice(hot_keywords)
-        encoded_keyword = urllib.parse.quote(keyword)
-        rss_url = f"https://news.google.com/rss/search?q={encoded_keyword}&hl=ml&gl=IN&ceid=IN:ml"
-    else:
-        # ബാക്കി 15% സമയം പൊതുവായ ട്രെൻഡിങ് വാർത്തകൾ എടുക്കും
-        rss_url = "https://news.google.com/rss?hl=ml&gl=IN&ceid=IN:ml"
-        
+def get_trending_topics():
+    # ഗൂഗിൾ ന്യൂസിൽ നിന്നുള്ള യഥാർത്ഥ റിയൽ-ടൈം വാർത്തകൾ എടുക്കുന്നു
+    rss_url = "https://news.google.com/rss?hl=ml&gl=IN&ceid=IN:ml"
     try:
         headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'}
         response = requests.get(rss_url, headers=headers, timeout=30)
         feed = feedparser.parse(response.content)
         
         if feed.entries:
-            entry = random.choice(feed.entries[:5])
-            return f"Topic: {entry.title}"
+            # ഏറ്റവും പുതിയ 15 വാർത്തകളുടെ തലക്കെട്ടുകൾ AI-ക്ക് കൊടുക്കാൻ എടുക്കുന്നു
+            titles = [entry.title for entry in feed.entries[:15]]
+            return "\n".join(titles)
         else:
-            return "സഞ്ജു സാംസണും ബിസിസിഐയും അല്ലെങ്കിൽ ഇന്നത്തെ പ്രധാന രാഷ്ട്രീയ ചർച്ചാവിഷയം"
+            return "ഇന്ത്യയിലെ ഇന്നത്തെ പ്രധാന ചർച്ചാവിഷയം"
     except Exception as e:
         print("Trending Fetch Error:", e)
-        return "സഞ്ജു സാംസണും ബിസിസിഐയും അല്ലെങ്കിൽ ഇന്നത്തെ പ്രധാന രാഷ്ട്രീയ ചർച്ചാവിഷയം"
+        return "ഇന്നത്തെ പ്രധാന സോഷ്യൽ മീഡിയ ട്രെൻഡിങ് വാർത്ത"
 
 def get_available_models():
     url = f"https://generativelanguage.googleapis.com/v1beta/models?key={GEMINI_API_KEY}"
@@ -56,24 +42,26 @@ def get_available_models():
         print("Model Fetch Error:", e)
     return available_models
 
-def get_post_content(topic):
+def get_post_content(topics_list):
     available_models = get_available_models()
     if not available_models:
         return None, None, None
 
-    preferences = ['gemini-3.8-flash', 'gemini-3.7-flash', 'gemini-3.6-flash', 'gemini-4-argon', 'gemini-4-carbon', 'gemini-4-hydrogen', 'gemini-3.8-flash-lite']
+    preferences = ['gemini-3.8-flash', 'gemini-3.7-flash', 'gemini-3.6-flash', 'gemini-4-argon', 'gemini-3.8-flash-lite']
     models_to_try = [m for m in preferences if m in available_models]
     for m in available_models:
         if m not in models_to_try:
             models_to_try.append(m)
             
-    # AI-ക്കുള്ള നിർദ്ദേശം കൂടുതൽ എന്റർടെയ്‌നിങ്ങും കമന്റുകൾ വരുന്ന രീതിയിലും ആക്കി മാറ്റി
+    # AI-ക്കുള്ള നിർദ്ദേശം: ലിസ്റ്റിൽ നിന്ന് ഏറ്റവും ചൂടേറിയ വാർത്ത മാത്രം എടുക്കാൻ
     prompt = f"""
-    വിഷയം: '{topic}'
-    ഈ വിഷയത്തെ അടിസ്ഥാനമാക്കി താഴെ പറയുന്ന 3 കാര്യങ്ങൾ തയ്യാറാക്കുക. 
-    മറുപടി കൃത്യമായി '|' ഉപയോഗിച്ച് വേർതിരിച്ചിരിക്കണം. വേറെ ഒന്നും എഴുതരുത്.
+    താഴെ ഇന്നത്തെ പ്രധാന വാർത്തകളുടെ തലക്കെട്ടുകൾ നൽകിയിരിക്കുന്നു:
     
-    ഫോർമാറ്റ്: [ചിത്രത്തിൽ എഴുതാനുള്ള വായനക്കാരെ പ്രകോപിപ്പിക്കുന്നതോ അല്ലെങ്കിൽ അവരോട് അഭിപ്രായം ചോദിക്കുന്നതോ ആയ ഒരു കിടിലൻ മലയാളം ചോദ്യം] | [ഫേസ്ബുക്കിൽ ഇടാനുള്ള ആളുകളെക്കൊണ്ട് നിർബന്ധമായും കമന്റ് ചെയ്യിപ്പിക്കുന്ന തരത്തിലുള്ള ആവേശകരമായ മലയാളം ക്യാപ്ഷൻ (ഹാഷ്‌ടാഗ് അടക്കം)] | [High quality, watermark free ഫോട്ടോ ഇന്റർനെറ്റിൽ തിരയാനുള്ള 2-3 ഇംഗ്ലീഷ് വാക്കുകൾ]
+    {topics_list}
+    
+    ഇതിൽ നിന്നും ആളുകൾ ഏറ്റവും കൂടുതൽ ചർച്ച ചെയ്യാൻ സാധ്യതയുള്ള, ഏറ്റവും 'Trending' ആയ ഒരു വാർത്ത മാത്രം തിരഞ്ഞെടുക്കുക (ഉദാഹരണത്തിന്: സ്വർണ്ണവില ഇടിഞ്ഞത്, ധോണിയുടെ വിരമിക്കൽ പോലെയുള്ളവ). ആ തിരഞ്ഞെടുത്ത വാർത്തയെ അടിസ്ഥാനമാക്കി താഴെ പറയുന്ന 3 കാര്യങ്ങൾ തയ്യാറാക്കുക. മറുപടി കൃത്യമായി '|' ഉപയോഗിച്ച് വേർതിരിച്ചിരിക്കണം.
+    
+    ഫോർമാറ്റ്: [ചിത്രത്തിൽ എഴുതാനുള്ള വായനക്കാരെ ചിന്തിപ്പിക്കുന്നതോ ആകർഷിക്കുന്നതോ ആയ ഒരു വരി മലയാളം (വളരെ നീളം കൂടരുത്)] | [ഫേസ്ബുക്കിൽ ഇടാനുള്ള ആളുകളെക്കൊണ്ട് കമന്റ് ചെയ്യിപ്പിക്കുന്ന തരത്തിലുള്ള കിടിലൻ മലയാളം ക്യാപ്ഷൻ (ഹാഷ്‌ടാഗ് അടക്കം)] | [High Quality HD ഫോട്ടോ ഇന്റർനെറ്റിൽ തിരയാനുള്ള 3-4 ഇംഗ്ലീഷ് വാക്കുകൾ]
     """
     headers = {'Content-Type': 'application/json'}
     data = {"contents": [{"parts": [{"text": prompt}]}]}
@@ -95,9 +83,11 @@ def get_post_content(topic):
     return None, None, None
 
 def fetch_image(query):
+    # HD ഫോട്ടോ ലഭിക്കാൻ ക്വറിയിൽ HD എന്ന് ചേർക്കുന്നു
+    hd_query = query + " high resolution HD"
     try:
         from ddgs import DDGS
-        results = DDGS().images(query, max_results=1)
+        results = DDGS().images(hd_query, max_results=1)
         if results:
             img_url = results[0]['image']
             headers = {'User-Agent': 'Mozilla/5.0'}
@@ -130,8 +120,18 @@ def add_text_to_image(image, text):
     width, height = image.size
     draw = ImageDraw.Draw(image)
     
+    # സ്റ്റൈലിഷ് ആയ Noto Sans Bold മലയാളം ഫോണ്ട് ഡൗൺലോഡ് ചെയ്യുന്നു
+    font_path = "NotoSansMalayalam-Bold.ttf"
+    if not os.path.exists(font_path):
+        try:
+            print("സ്റ്റൈലിഷ് ഫോണ്ട് ഡൗൺലോഡ് ചെയ്യുന്നു...")
+            font_url = "https://github.com/googlefonts/noto-fonts/raw/main/unhinted/ttf/NotoSansMalayalam/NotoSansMalayalam-Bold.ttf"
+            urllib.request.urlretrieve(font_url, font_path)
+        except:
+            pass
+            
     try:
-        font = ImageFont.truetype("Manjari-Bold.ttf", int(width/20))
+        font = ImageFont.truetype(font_path, int(width/16))
     except:
         font = ImageFont.load_default()
         
@@ -164,16 +164,17 @@ def add_text_to_image(image, text):
     try:
         line_height = draw.textbbox((0, 0), "ക്യ", font=font)[3] - draw.textbbox((0, 0), "ക്യ", font=font)[1]
     except:
-        line_height = font.getsize("ക്യ")[1]
+        line_height = int(width/16)
         
     line_spacing = 15
     total_text_height = (len(lines) * line_height) + ((len(lines) - 1) * line_spacing)
     
-    box_top = height - total_text_height - 60
+    # കറുത്ത ബാക്ക്ഗ്രൗണ്ട് ബോക്സ് പൂർണ്ണമായും ഒഴിവാക്കി! 
+    # ഫോട്ടോയുടെ താഴെയായി ടെക്സ്റ്റ് വെക്കുന്നു
+    y_text = height - total_text_height - 50 
+    if y_text < 30: 
+        y_text = 30
     
-    draw.rectangle(((0, box_top), (width, height)), fill=(0, 0, 0, 200))
-    
-    y_text = box_top + 30
     for line in lines:
         try:
             bbox = draw.textbbox((0, 0), line, font=font)
@@ -182,7 +183,9 @@ def add_text_to_image(image, text):
             text_w = font.getsize(line)[0]
             
         x_text = (width - text_w) / 2
-        draw.text((x_text, y_text), line, font=font, fill="yellow")
+        
+        # കിടിലൻ സ്റ്റൈൽ: വെളുത്ത അക്ഷരങ്ങൾക്ക് ചുറ്റും കട്ടിയുള്ള കറുത്ത ബോർഡർ നൽകുന്നു (Text Stroke)
+        draw.text((x_text, y_text), line, font=font, fill="#FFFFFF", stroke_width=4, stroke_fill="#000000")
         y_text += line_height + line_spacing
         
     image_path = "fb_post.jpg"
@@ -203,10 +206,10 @@ def post_to_facebook(image_path, caption):
 
 def main():
     print("സ്ക്രിപ്റ്റ് തുടങ്ങി...")
-    topic = get_trending_topic()
-    print(f"കണ്ടെത്തിയ വിഷയം: {topic}")
+    # യഥാർത്ഥ വാർത്തകൾ എടുക്കുന്നു
+    topics_list = get_trending_topics() 
     
-    image_text, caption, search_query = get_post_content(topic)
+    image_text, caption, search_query = get_post_content(topics_list)
     
     if image_text and caption and search_query:
         print("ഫോട്ടോ ഡൗൺലോഡ് ചെയ്യുന്നു...")
