@@ -50,16 +50,17 @@ def get_post_content(topics_list):
         if m not in models_to_try:
             models_to_try.append(m)
             
+    # ഇമേജ് സെർച്ച് ചെയ്യാൻ കൃത്യമായ ലളിതമായ വാക്കുകൾ ചോദിക്കുന്നു
     prompt = f"""
     താഴെ ഇന്നത്തെ പ്രധാന വാർത്തകളുടെ തലക്കെട്ടുകൾ നൽകിയിരിക്കുന്നു:
     {topics_list}
     
-    ഇതിൽ നിന്നും ആളുകൾ ഏറ്റവും കൂടുതൽ ചർച്ച ചെയ്യാൻ സാധ്യതയുള്ള, ഏറ്റവും 'Trending' ആയ ഒരു വാർത്ത മാത്രം തിരഞ്ഞെടുക്കുക (ഉദാഹരണത്തിന്: സ്വർണ്ണവില ഇടിഞ്ഞത്, ധോണിയുടെ വിരമിക്കൽ പോലെയുള്ളവ). 
+    ഇതിൽ നിന്നും ആളുകൾ ഏറ്റവും കൂടുതൽ ചർച്ച ചെയ്യാൻ സാധ്യതയുള്ള ഒരു വാർത്ത മാത്രം തിരഞ്ഞെടുക്കുക (ഉദാഹരണത്തിന്: സ്വർണ്ണവില ഇടിഞ്ഞത്, ധോണിയുടെ വിരമിക്കൽ, റെയിൽവേ ഫൈൻ പോലെയുള്ളവ). 
     
     ഈ വാർത്തയെ അടിസ്ഥാനമാക്കി താഴെ പറയുന്ന 3 കാര്യങ്ങൾ മാത്രം കൃത്യമായി '|' ഉപയോഗിച്ച് വേർതിരിച്ച് നൽകുക. ബ്രാക്കറ്റുകളോ മറ്റ് ചിഹ്നങ്ങളോ ഉപയോഗിക്കരുത്.
     
     മാതൃക (ഈ രീതിയിൽ മാത്രം മറുപടി നൽകുക):
-    ഇവിടെ ചിത്രത്തിൽ എഴുതാനുള്ള ഒരു വരി മലയാളം ചോദ്യം വരണം | ഇവിടെ ഫേസ്ബുക്കിൽ ഇടാനുള്ള കിടിലൻ മലയാളം ക്യാപ്ഷനും ഹാഷ്‌ടാഗുകളും വരണം | ഇവിടെ ഫോട്ടോ ഇന്റർനെറ്റിൽ തിരയാനുള്ള 2 ഇംഗ്ലീഷ് വാക്കുകൾ വരണം
+    ചിത്രത്തിൽ എഴുതാനുള്ള ഒരു വരി മലയാളം ചോദ്യം | ഫേസ്ബുക്കിൽ ഇടാനുള്ള കിടിലൻ മലയാളം ക്യാപ്ഷനും ഹാഷ്‌ടാഗുകളും | ഫോട്ടോ ഇന്റർനെറ്റിൽ തിരയാൻ സഹായിക്കുന്ന 1 അല്ലെങ്കിൽ 2 ലളിതമായ ഇംഗ്ലീഷ് വാക്കുകൾ (ഉദാഹരണത്തിന്: Indian Train, Gold Coins, Kerala Police)
     """
     
     headers = {'Content-Type': 'application/json'}
@@ -83,10 +84,12 @@ def get_post_content(topics_list):
     return None, None, None
 
 def fetch_image(query):
+    # ഇമേജ് തിരയൽ കൂടുതൽ കൃത്യമാക്കാൻ "HD photography" ചേർക്കുന്നു
     print(f"തിരയുന്ന ഫോട്ടോ: {query}")
+    search_query = query + " HD photography"
     try:
         from ddgs import DDGS
-        results = DDGS().images(query, max_results=3)
+        results = DDGS().images(search_query, max_results=3)
         for res in results:
             img_url = res['image']
             headers = {'User-Agent': 'Mozilla/5.0'}
@@ -119,14 +122,13 @@ def add_text_to_image(image, text):
     width, height = image.size
     draw = ImageDraw.Draw(image)
     
-    # ഗിറ്റ്ഹബ്ബിൽ നേരിട്ട് അപ്‌ലോഡ് ചെയ്ത ഫോണ്ട് ഫയൽ ഉപയോഗിക്കുന്നു
     font_path = "MalayalamFont.ttf"
             
     try:
-        font = ImageFont.truetype(font_path, int(width/16))
+        # ഫോണ്ട് സൈസ് അല്പം കൂട്ടി
+        font = ImageFont.truetype(font_path, int(width/15))
     except Exception as e:
-        print("മുന്നറിയിപ്പ്: മലയാളം ഫോണ്ട് ഗിറ്റ്ഹബ്ബിൽ കണ്ടെത്താനായില്ല! ദയവായി 'MalayalamFont.ttf' എന്ന പേരിൽ ഫയൽ അപ്‌ലോഡ് ചെയ്തിട്ടുണ്ടെന്ന് ഉറപ്പാക്കുക.")
-        print("Error:", e)
+        print("Error loading font:", e)
         font = ImageFont.load_default()
         
     margin = 40
@@ -158,12 +160,13 @@ def add_text_to_image(image, text):
     try:
         line_height = draw.textbbox((0, 0), "ക്യ", font=font)[3] - draw.textbbox((0, 0), "ക്യ", font=font)[1]
     except:
-        line_height = int(width/16)
+        line_height = int(width/15)
         
-    line_spacing = 15
+    # വരികൾ തമ്മിലുള്ള അകലം (Line Spacing) വല്ലാതെ കൂട്ടി!
+    line_spacing = 40 
     total_text_height = (len(lines) * line_height) + ((len(lines) - 1) * line_spacing)
     
-    y_text = height - total_text_height - 50 
+    y_text = height - total_text_height - 60 
     if y_text < 30: 
         y_text = 30
     
@@ -176,8 +179,8 @@ def add_text_to_image(image, text):
             
         x_text = (width - text_w) / 2
         
-        # വെള്ള അക്ഷരങ്ങൾക്ക് ചുറ്റും കറുത്ത ബോർഡർ (Outline)
-        draw.text((x_text, y_text), line, font=font, fill="#FFFFFF", stroke_width=5, stroke_fill="#000000")
+        # ടെക്സ്റ്റ് കൂടുതൽ വ്യക്തമായി കാണാൻ സ്ട്രോക്ക് കനം കൂട്ടി
+        draw.text((x_text, y_text), line, font=font, fill="#FFFFFF", stroke_width=6, stroke_fill="#000000")
         y_text += line_height + line_spacing
         
     image_path = "fb_post.jpg"
