@@ -1,6 +1,8 @@
 import requests
 import feedparser
 import os
+import re
+import urllib.parse
 from PIL import Image, ImageDraw, ImageFont
 from io import BytesIO
 
@@ -50,17 +52,17 @@ def get_post_content(topics_list):
         if m not in models_to_try:
             models_to_try.append(m)
             
-    # ഇമേജ് സെർച്ച് ചെയ്യാൻ കൃത്യമായ ലളിതമായ വാക്കുകൾ ചോദിക്കുന്നു
+    # ഫോളോ ചെയ്യാൻ പറയുന്ന വരി കൂടി AI നിർദ്ദേശത്തിൽ ഉൾപ്പെടുത്തി
     prompt = f"""
     താഴെ ഇന്നത്തെ പ്രധാന വാർത്തകളുടെ തലക്കെട്ടുകൾ നൽകിയിരിക്കുന്നു:
     {topics_list}
     
-    ഇതിൽ നിന്നും ആളുകൾ ഏറ്റവും കൂടുതൽ ചർച്ച ചെയ്യാൻ സാധ്യതയുള്ള ഒരു വാർത്ത മാത്രം തിരഞ്ഞെടുക്കുക (ഉദാഹരണത്തിന്: സ്വർണ്ണവില ഇടിഞ്ഞത്, ധോണിയുടെ വിരമിക്കൽ, റെയിൽവേ ഫൈൻ പോലെയുള്ളവ). 
+    ഇതിൽ നിന്നും ആളുകൾ ഏറ്റവും കൂടുതൽ ചർച്ച ചെയ്യാൻ സാധ്യതയുള്ള ഒരു വാർത്ത മാത്രം തിരഞ്ഞെടുക്കുക. ഈ വാർത്തയെ അടിസ്ഥാനമാക്കി താഴെ പറയുന്ന 3 കാര്യങ്ങൾ മാത്രം കൃത്യമായി '|' ഉപയോഗിച്ച് വേർതിരിച്ച് നൽകുക. ബ്രാക്കറ്റുകളോ മറ്റ് ചിഹ്നങ്ങളോ ഉപയോഗിക്കരുത്.
     
-    ഈ വാർത്തയെ അടിസ്ഥാനമാക്കി താഴെ പറയുന്ന 3 കാര്യങ്ങൾ മാത്രം കൃത്യമായി '|' ഉപയോഗിച്ച് വേർതിരിച്ച് നൽകുക. ബ്രാക്കറ്റുകളോ മറ്റ് ചിഹ്നങ്ങളോ ഉപയോഗിക്കരുത്.
+    പ്രധാന നിർദ്ദേശം: ക്യാപ്ഷന്റെ ഏറ്റവും താഴെയായി, ഈ പേജ് ഫോളോ ചെയ്ത് സപ്പോർട്ട് ചെയ്യാൻ ആവശ്യപ്പെടുന്ന ആകർഷകമായ ഒരു വരി കൂടി ഉൾപ്പെടുത്തണം. (ഉദാഹരണത്തിന്: 'ഇതുപോലുള്ള അപ്ഡേറ്റുകൾക്കും വാർത്തകൾക്കുമായി ഈ പേജ് ഫോളോ ചെയ്ത് സപ്പോർട്ട് ചെയ്യണേ..')
     
     മാതൃക (ഈ രീതിയിൽ മാത്രം മറുപടി നൽകുക):
-    ചിത്രത്തിൽ എഴുതാനുള്ള ഒരു വരി മലയാളം ചോദ്യം | ഫേസ്ബുക്കിൽ ഇടാനുള്ള കിടിലൻ മലയാളം ക്യാപ്ഷനും ഹാഷ്‌ടാഗുകളും | ഫോട്ടോ ഇന്റർനെറ്റിൽ തിരയാൻ സഹായിക്കുന്ന 1 അല്ലെങ്കിൽ 2 ലളിതമായ ഇംഗ്ലീഷ് വാക്കുകൾ (ഉദാഹരണത്തിന്: Indian Train, Gold Coins, Kerala Police)
+    ചിത്രത്തിൽ എഴുതാനുള്ള ഒരു വരി മലയാളം ചോദ്യം | ഫേസ്ബുക്കിൽ ഇടാനുള്ള കിടിലൻ മലയാളം ക്യാപ്ഷനും ഫോളോ ചെയ്യാനുള്ള അഭ്യർത്ഥനയും ഹാഷ്‌ടാഗുകളും | ഫോട്ടോ ഇന്റർനെറ്റിൽ തിരയാൻ സഹായിക്കുന്ന 1 അല്ലെങ്കിൽ 2 ലളിതമായ ഇംഗ്ലീഷ് വാക്കുകൾ (ഉദാഹരണത്തിന്: Kerala Police, Gold Coin)
     """
     
     headers = {'Content-Type': 'application/json'}
@@ -84,36 +86,57 @@ def get_post_content(topics_list):
     return None, None, None
 
 def fetch_image(query):
-    # ഇമേജ് തിരയൽ കൂടുതൽ കൃത്യമാക്കാൻ "HD photography" ചേർക്കുന്നു
     print(f"തിരയുന്ന ഫോട്ടോ: {query}")
-    search_query = query + " HD photography"
+    search_query = query + " HD"
+    
+    # 1. ആദ്യം DuckDuckGo-യിൽ തിരയുന്നു
     try:
+        print("DuckDuckGo-യിൽ തിരയുന്നു...")
         from ddgs import DDGS
-        results = DDGS().images(search_query, max_results=3)
+        results = DDGS().images(search_query, max_results=2)
         for res in results:
             img_url = res['image']
             headers = {'User-Agent': 'Mozilla/5.0'}
-            response = requests.get(img_url, headers=headers, timeout=20)
+            response = requests.get(img_url, headers=headers, timeout=15)
             if response.status_code == 200 and 'image' in response.headers.get('Content-Type', ''):
                 return Image.open(BytesIO(response.content))
     except Exception as e:
-        print("DuckDuckGo Image Error:", e)
+        print("DDG Error:", e)
 
+    # 2. രണ്ടാമതായി ഗൂഗിളിൽ നിന്ന് നേരിട്ട് സ്ക്രാപ്പ് ചെയ്യുന്നു (പുതിയ ഫീച്ചർ!)
     try:
+        print("Google Images-ൽ തിരയുന്നു (Scraping)...")
+        google_url = f"https://www.google.com/search?q={urllib.parse.quote(search_query)}&tbm=isch"
+        headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Safari/537.36'}
+        html = requests.get(google_url, headers=headers, timeout=20).text
+        image_urls = re.findall(r'https?://[^"\'\s>]+(?:\.jpg|\.jpeg|\.png)', html)
+        for img_url in image_urls:
+            if 'gstatic' not in img_url and 'logo' not in img_url.lower():
+                img_resp = requests.get(img_url, headers=headers, timeout=10)
+                if img_resp.status_code == 200:
+                    return Image.open(BytesIO(img_resp.content))
+    except Exception as e:
+        print("Google Search Error:", e)
+
+    # 3. അവസാനം Wikipedia-യിൽ തിരയുന്നു
+    try:
+        print("Wikipedia-യിൽ തിരയുന്നു...")
         search_term = " ".join(query.split()[:2]) 
         url = f"https://en.wikipedia.org/w/api.php?action=query&format=json&prop=pageimages&generator=search&gsrsearch={search_term}&gsrlimit=3&pithumbsize=1000"
         headers = {'User-Agent': 'AutoFBPostBot/1.0'}
-        res = requests.get(url, headers=headers, timeout=20).json()
+        res = requests.get(url, headers=headers, timeout=15).json()
         pages = res.get('query', {}).get('pages', {})
         if pages:
             for page_id in pages:
                 img_url = pages[page_id].get('thumbnail', {}).get('source')
                 if img_url:
-                    img_data = requests.get(img_url, headers=headers, timeout=20).content
+                    img_data = requests.get(img_url, headers=headers, timeout=15).content
                     return Image.open(BytesIO(img_data))
     except Exception as e:
-        print("Wiki Image Error:", e)
+        print("Wiki Error:", e)
         
+    # നാലും പരാജയപ്പെട്ടാൽ മാത്രം ഡാർക്ക് ബാക്ക്ഗ്രൗണ്ട്
+    print("ഫോട്ടോ കണ്ടെത്താനായില്ല, ഡാർക്ക് ബാക്ക്ഗ്രൗണ്ട് ഉപയോഗിക്കുന്നു.")
     img = Image.new('RGB', (1080, 1080), color=(40, 44, 52))
     return img
 
@@ -125,7 +148,6 @@ def add_text_to_image(image, text):
     font_path = "MalayalamFont.ttf"
             
     try:
-        # ഫോണ്ട് സൈസ് അല്പം കൂട്ടി
         font = ImageFont.truetype(font_path, int(width/15))
     except Exception as e:
         print("Error loading font:", e)
@@ -162,7 +184,6 @@ def add_text_to_image(image, text):
     except:
         line_height = int(width/15)
         
-    # വരികൾ തമ്മിലുള്ള അകലം (Line Spacing) വല്ലാതെ കൂട്ടി!
     line_spacing = 40 
     total_text_height = (len(lines) * line_height) + ((len(lines) - 1) * line_spacing)
     
@@ -179,7 +200,6 @@ def add_text_to_image(image, text):
             
         x_text = (width - text_w) / 2
         
-        # ടെക്സ്റ്റ് കൂടുതൽ വ്യക്തമായി കാണാൻ സ്ട്രോക്ക് കനം കൂട്ടി
         draw.text((x_text, y_text), line, font=font, fill="#FFFFFF", stroke_width=6, stroke_fill="#000000")
         y_text += line_height + line_spacing
         
