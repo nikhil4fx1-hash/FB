@@ -52,7 +52,6 @@ def get_post_content(topics_list):
         if m not in models_to_try:
             models_to_try.append(m)
             
-    # ഫോളോ ചെയ്യാൻ പറയുന്ന വരി കൂടി AI നിർദ്ദേശത്തിൽ ഉൾപ്പെടുത്തി
     prompt = f"""
     താഴെ ഇന്നത്തെ പ്രധാന വാർത്തകളുടെ തലക്കെട്ടുകൾ നൽകിയിരിക്കുന്നു:
     {topics_list}
@@ -62,7 +61,7 @@ def get_post_content(topics_list):
     പ്രധാന നിർദ്ദേശം: ക്യാപ്ഷന്റെ ഏറ്റവും താഴെയായി, ഈ പേജ് ഫോളോ ചെയ്ത് സപ്പോർട്ട് ചെയ്യാൻ ആവശ്യപ്പെടുന്ന ആകർഷകമായ ഒരു വരി കൂടി ഉൾപ്പെടുത്തണം. (ഉദാഹരണത്തിന്: 'ഇതുപോലുള്ള അപ്ഡേറ്റുകൾക്കും വാർത്തകൾക്കുമായി ഈ പേജ് ഫോളോ ചെയ്ത് സപ്പോർട്ട് ചെയ്യണേ..')
     
     മാതൃക (ഈ രീതിയിൽ മാത്രം മറുപടി നൽകുക):
-    ചിത്രത്തിൽ എഴുതാനുള്ള ഒരു വരി മലയാളം ചോദ്യം | ഫേസ്ബുക്കിൽ ഇടാനുള്ള കിടിലൻ മലയാളം ക്യാപ്ഷനും ഫോളോ ചെയ്യാനുള്ള അഭ്യർത്ഥനയും ഹാഷ്‌ടാഗുകളും | ഫോട്ടോ ഇന്റർനെറ്റിൽ തിരയാൻ സഹായിക്കുന്ന 1 അല്ലെങ്കിൽ 2 ലളിതമായ ഇംഗ്ലീഷ് വാക്കുകൾ (ഉദാഹരണത്തിന്: Kerala Police, Gold Coin)
+    ചിത്രത്തിൽ എഴുതാനുള്ള ഒരു വരി മലയാളം ചോദ്യം | ഫേസ്ബുക്കിൽ ഇടാനുള്ള കിടിലൻ മലയാളം ക്യാപ്ഷനും ഫോളോ ചെയ്യാനുള്ള അഭ്യർത്ഥനയും ഹാഷ്‌ടാഗുകളും | ഫോട്ടോ ഇന്റർനെറ്റിൽ തിരയാൻ സഹായിക്കുന്ന 1 അല്ലെങ്കിൽ 2 ലളിതമായ ഇംഗ്ലീഷ് വാക്കുകൾ (ഉദാഹരണത്തിന്: Kerala Politics, Train)
     """
     
     headers = {'Content-Type': 'application/json'}
@@ -87,43 +86,52 @@ def get_post_content(topics_list):
 
 def fetch_image(query):
     print(f"തിരയുന്ന ഫോട്ടോ: {query}")
-    search_query = query + " HD"
+    search_query = query + " HD news photography"
+    headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Safari/537.36'}
     
-    # 1. ആദ്യം DuckDuckGo-യിൽ തിരയുന്നു
+    # 1. Bing Images Scraper (ഏറ്റവും മികച്ചതും ഗിറ്റ്ഹബ്ബിൽ വർക്ക് ആകുന്നതും)
+    try:
+        print("Bing-ൽ തിരയുന്നു...")
+        bing_url = f"https://www.bing.com/images/search?q={urllib.parse.quote(search_query)}"
+        html = requests.get(bing_url, headers=headers, timeout=20).text
+        # Bing സ്റ്റോർ ചെയ്യുന്ന യഥാർത്ഥ ഇമേജ് ലിങ്കുകൾ കണ്ടെത്തുന്നു
+        image_urls = re.findall(r'murl&quot;:&quot;(http[^&]+)&quot;', html)
+        for img_url in image_urls:
+            try:
+                img_resp = requests.get(img_url, headers=headers, timeout=10)
+                if img_resp.status_code == 200:
+                    img = Image.open(BytesIO(img_resp.content))
+                    if img.mode != 'RGB':
+                        img = img.convert('RGB')
+                    return img
+            except:
+                continue
+    except Exception as e:
+        print("Bing Search Error:", e)
+
+    # 2. DuckDuckGo
     try:
         print("DuckDuckGo-യിൽ തിരയുന്നു...")
         from ddgs import DDGS
-        results = DDGS().images(search_query, max_results=2)
+        results = DDGS().images(search_query, max_results=3)
         for res in results:
-            img_url = res['image']
-            headers = {'User-Agent': 'Mozilla/5.0'}
-            response = requests.get(img_url, headers=headers, timeout=15)
-            if response.status_code == 200 and 'image' in response.headers.get('Content-Type', ''):
-                return Image.open(BytesIO(response.content))
+            try:
+                img_resp = requests.get(res['image'], headers=headers, timeout=10)
+                if img_resp.status_code == 200:
+                    img = Image.open(BytesIO(img_resp.content))
+                    if img.mode != 'RGB':
+                        img = img.convert('RGB')
+                    return img
+            except:
+                continue
     except Exception as e:
         print("DDG Error:", e)
 
-    # 2. രണ്ടാമതായി ഗൂഗിളിൽ നിന്ന് നേരിട്ട് സ്ക്രാപ്പ് ചെയ്യുന്നു (പുതിയ ഫീച്ചർ!)
-    try:
-        print("Google Images-ൽ തിരയുന്നു (Scraping)...")
-        google_url = f"https://www.google.com/search?q={urllib.parse.quote(search_query)}&tbm=isch"
-        headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Safari/537.36'}
-        html = requests.get(google_url, headers=headers, timeout=20).text
-        image_urls = re.findall(r'https?://[^"\'\s>]+(?:\.jpg|\.jpeg|\.png)', html)
-        for img_url in image_urls:
-            if 'gstatic' not in img_url and 'logo' not in img_url.lower():
-                img_resp = requests.get(img_url, headers=headers, timeout=10)
-                if img_resp.status_code == 200:
-                    return Image.open(BytesIO(img_resp.content))
-    except Exception as e:
-        print("Google Search Error:", e)
-
-    # 3. അവസാനം Wikipedia-യിൽ തിരയുന്നു
+    # 3. Wikipedia
     try:
         print("Wikipedia-യിൽ തിരയുന്നു...")
         search_term = " ".join(query.split()[:2]) 
-        url = f"https://en.wikipedia.org/w/api.php?action=query&format=json&prop=pageimages&generator=search&gsrsearch={search_term}&gsrlimit=3&pithumbsize=1000"
-        headers = {'User-Agent': 'AutoFBPostBot/1.0'}
+        url = f"https://en.wikipedia.org/w/api.php?action=query&format=json&prop=pageimages&generator=search&gsrsearch={urllib.parse.quote(search_term)}&gsrlimit=3&pithumbsize=1000"
         res = requests.get(url, headers=headers, timeout=15).json()
         pages = res.get('query', {}).get('pages', {})
         if pages:
@@ -131,11 +139,13 @@ def fetch_image(query):
                 img_url = pages[page_id].get('thumbnail', {}).get('source')
                 if img_url:
                     img_data = requests.get(img_url, headers=headers, timeout=15).content
-                    return Image.open(BytesIO(img_data))
+                    img = Image.open(BytesIO(img_data))
+                    if img.mode != 'RGB':
+                        img = img.convert('RGB')
+                    return img
     except Exception as e:
         print("Wiki Error:", e)
         
-    # നാലും പരാജയപ്പെട്ടാൽ മാത്രം ഡാർക്ക് ബാക്ക്ഗ്രൗണ്ട്
     print("ഫോട്ടോ കണ്ടെത്താനായില്ല, ഡാർക്ക് ബാക്ക്ഗ്രൗണ്ട് ഉപയോഗിക്കുന്നു.")
     img = Image.new('RGB', (1080, 1080), color=(40, 44, 52))
     return img
