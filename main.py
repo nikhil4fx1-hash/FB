@@ -52,16 +52,17 @@ def get_post_content(topics_list):
         if m not in models_to_try:
             models_to_try.append(m)
             
+    # AI-ക്കുള്ള നിർദ്ദേശം കൂടുതൽ വിശദമായ വാർത്തകൾ എഴുതാൻ വേണ്ടി മാറ്റി
     prompt = f"""
     താഴെ ഇന്നത്തെ പ്രധാന വാർത്തകളുടെ തലക്കെട്ടുകൾ നൽകിയിരിക്കുന്നു:
     {topics_list}
     
-    ഇതിൽ നിന്നും ആളുകൾ ഏറ്റവും കൂടുതൽ ചർച്ച ചെയ്യാൻ സാധ്യതയുള്ള ഒരു വാർത്ത മാത്രം തിരഞ്ഞെടുക്കുക. ഈ വാർത്തയെ അടിസ്ഥാനമാക്കി താഴെ പറയുന്ന 3 കാര്യങ്ങൾ മാത്രം കൃത്യമായി '|' ഉപയോഗിച്ച് വേർതിരിച്ച് നൽകുക. ബ്രാക്കറ്റുകളോ മറ്റ് ചിഹ്നങ്ങളോ ഉപയോഗിക്കരുത്.
+    ഇതിൽ നിന്നും ആളുകൾ ഏറ്റവും കൂടുതൽ ചർച്ച ചെയ്യാൻ സാധ്യതയുള്ള ഒരു പ്രധാന വാർത്ത തിരഞ്ഞെടുക്കുക. ഈ വാർത്തയെ അടിസ്ഥാനമാക്കി താഴെ പറയുന്ന 3 കാര്യങ്ങൾ മാത്രം കൃത്യമായി '|' എന്ന ചിഹ്നം ഉപയോഗിച്ച് വേർതിരിച്ച് നൽകുക.
     
-    പ്രധാന നിർദ്ദേശം: ക്യാപ്ഷന്റെ ഏറ്റവും താഴെയായി, ഈ പേജ് ഫോളോ ചെയ്ത് സപ്പോർട്ട് ചെയ്യാൻ ആവശ്യപ്പെടുന്ന ആകർഷകമായ ഒരു വരി കൂടി ഉൾപ്പെടുത്തണം.
+    പ്രധാന നിർദ്ദേശം: ഫേസ്ബുക്ക് ക്യാപ്ഷൻ വെറുമൊരു ചോദ്യത്തിൽ ഒതുക്കരുത്. വാർത്തയുടെ പൂർണ്ണ വിവരങ്ങളും പശ്ചാത്തലവും വ്യക്തമായി ഉൾപ്പെടുത്തി കുറഞ്ഞത് 2 അല്ലെങ്കിൽ 3 പാരഗ്രാഫുകളുള്ള വളരെ വിശദമായ ഒരു വാർത്താക്കുറിപ്പ് (Detailed News Report) തയ്യാറാക്കണം. ഇതിനുശേഷം മാത്രം ആളുകളുടെ അഭിപ്രായം ചോദിക്കുകയും, അവസാനം പേജ് ഫോളോ ചെയ്യാൻ സ്നേഹത്തോടെ അഭ്യർത്ഥിക്കുകയും ചെയ്യുക.
     
-    മാതൃക (ഈ രീതിയിൽ മാത്രം മറുപടി നൽകുക):
-    ചിത്രത്തിൽ എഴുതാനുള്ള ആകർഷകമായ ഒരു വരി മലയാളം ചോദ്യം (വളരെ നീളം കൂടരുത്) | ഫേസ്ബുക്കിൽ ഇടാനുള്ള കിടിലൻ മലയാളം ക്യാപ്ഷനും ഫോളോ ചെയ്യാനുള്ള അഭ്യർത്ഥനയും ഹാഷ്‌ടാഗുകളും | ഫോട്ടോ ഇന്റർനെറ്റിൽ തിരയാൻ സഹായിക്കുന്ന 1 അല്ലെങ്കിൽ 2 ലളിതമായ ഇംഗ്ലീഷ് വാക്കുകൾ
+    മാതൃക (ഈ ഫോർമാറ്റിൽ മാത്രം മറുപടി നൽകുക):
+    ചിത്രത്തിൽ എഴുതാനുള്ള ആകർഷകമായ ചെറിയ മലയാളം വരി | വാർത്തയുടെ പൂർണ്ണ വിവരങ്ങൾ അടങ്ങിയ വളരെ വിശദമായ മലയാളം ക്യാപ്ഷൻ, നിങ്ങളുടെ അഭിപ്രായം താഴെ പറയൂ എന്ന വരി, ഫോളോ ചെയ്യാനുള്ള അഭ്യർത്ഥന, ഹാഷ്‌ടാഗുകൾ | ഫോട്ടോ ഇന്റർനെറ്റിൽ തിരയാൻ സഹായിക്കുന്ന 2 ഇംഗ്ലീഷ് വാക്കുകൾ
     """
     
     headers = {'Content-Type': 'application/json'}
@@ -89,7 +90,6 @@ def fetch_image(query):
     search_query = query + " news high quality"
     headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'}
     
-    # 1. Bing Images 
     try:
         print("Bing-ൽ തിരയുന്നു...")
         bing_url = f"https://www.bing.com/images/search?q={urllib.parse.quote(search_query)}"
@@ -106,7 +106,6 @@ def fetch_image(query):
     except:
         pass
 
-    # 2. Google Images Scraper
     try:
         print("Google Images-ൽ തിരയുന്നു...")
         google_url = f"https://www.google.com/search?q={urllib.parse.quote(search_query)}&tbm=isch"
@@ -128,27 +127,25 @@ def fetch_image(query):
     return Image.new('RGB', (1080, 1080), color=(30, 30, 30))
 
 def process_and_add_text(image, text):
-    # 1. പോസ്റ്റർ സൈസിലേക്ക് മാറ്റുന്നു (1080x1080 Square)
     target_size = 1080
     img_w, img_h = image.size
     aspect = img_w / float(img_h)
     
-    if aspect > 1: # Landscape
+    if aspect > 1:
         new_h = target_size
         new_w = int(aspect * new_h)
         image = image.resize((new_w, new_h), Image.Resampling.LANCZOS)
         left = (new_w - target_size) / 2
         image = image.crop((left, 0, left + target_size, target_size))
-    else: # Portrait or Square
+    else:
         new_w = target_size
         new_h = int(target_size / aspect)
         image = image.resize((new_w, new_h), Image.Resampling.LANCZOS)
         top = (new_h - target_size) / 2
         image = image.crop((0, top, target_size, top + target_size))
 
-    # 2. ബാക്ക്ഗ്രൗണ്ട് അല്പം ഡാർക്ക് ആക്കുന്നു (ടെക്സ്റ്റ് കൂടുതൽ വ്യക്തമാകാൻ)
     image = image.convert("RGBA")
-    overlay = Image.new('RGBA', image.size, (0, 0, 0, 120)) # പകുതി കറുപ്പ്
+    overlay = Image.new('RGBA', image.size, (0, 0, 0, 120))
     image = Image.alpha_composite(image, overlay)
     
     image = image.convert("RGB")
@@ -194,12 +191,10 @@ def process_and_add_text(image, text):
         
     line_spacing = 35 
     total_text_height = (len(lines) * line_height) + ((len(lines) - 1) * line_spacing)
-    y_text = (height - total_text_height) // 2  # ടെക്സ്റ്റ് മധ്യഭാഗത്തായി വെക്കുന്നു
+    y_text = (height - total_text_height) // 2  
     
-    # 3. വർണ്ണാഭമായ ബാക്ക്ഗ്രൗണ്ട് ബോക്സുകളുടെ ഡിസൈൻ
-    # ചുവപ്പ്, മഞ്ഞ, നീല, കറുപ്പ് നിറങ്ങൾ
     bg_colors = [(211, 47, 47), (255, 193, 7), (13, 71, 161), (33, 33, 33)]
-    text_colors = [(255, 255, 255), (0, 0, 0), (255, 255, 255), (255, 255, 255)] # മഞ്ഞയ്ക്ക് മാത്രം കറുത്ത അക്ഷരങ്ങൾ
+    text_colors = [(255, 255, 255), (0, 0, 0), (255, 255, 255), (255, 255, 255)] 
     
     for i, line in enumerate(lines):
         color_idx = i % len(bg_colors)
@@ -214,7 +209,6 @@ def process_and_add_text(image, text):
             
         x_text = (width - text_w) / 2
         
-        # ടെക്സ്റ്റിന് പിന്നിൽ കളർ ബോക്സ് വരയ്ക്കുന്നു
         padding_x = 30
         padding_y = 15
         
@@ -223,7 +217,6 @@ def process_and_add_text(image, text):
             fill=box_color
         )
         
-        # ബോക്സിനുള്ളിൽ ടെക്സ്റ്റ് എഴുതുന്നു
         draw.text((x_text, y_text), line, font=font, fill=txt_color)
         
         y_text += line_height + line_spacing
