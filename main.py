@@ -52,6 +52,7 @@ def get_post_content(topics_list):
         if m not in models_to_try:
             models_to_try.append(m)
             
+    # ഫോട്ടോ തിരയാൻ വാർത്തയുടെ യഥാർത്ഥ തലക്കെട്ട് തന്നെ ചോദിക്കുന്നു
     prompt = f"""
     താഴെ ഇന്നത്തെ പ്രധാന വാർത്തകളുടെ തലക്കെട്ടുകൾ നൽകിയിരിക്കുന്നു:
     {topics_list}
@@ -61,7 +62,7 @@ def get_post_content(topics_list):
     പ്രധാന നിർദ്ദേശം: ഫേസ്ബുക്ക് ക്യാപ്ഷൻ വെറുമൊരു ചോദ്യത്തിൽ ഒതുക്കരുത്. വാർത്തയുടെ പൂർണ്ണ വിവരങ്ങളും പശ്ചാത്തലവും വ്യക്തമായി ഉൾപ്പെടുത്തി കുറഞ്ഞത് 2 അല്ലെങ്കിൽ 3 പാരഗ്രാഫുകളുള്ള വളരെ വിശദമായ ഒരു വാർത്താക്കുറിപ്പ് (Detailed News Report) തയ്യാറാക്കണം. ഇതിനുശേഷം മാത്രം ആളുകളുടെ അഭിപ്രായം ചോദിക്കുകയും, അവസാനം പേജ് ഫോളോ ചെയ്യാൻ സ്നേഹത്തോടെ അഭ്യർത്ഥിക്കുകയും ചെയ്യുക.
     
     മാതൃക (ഈ ഫോർമാറ്റിൽ മാത്രം മറുപടി നൽകുക):
-    ചിത്രത്തിൽ എഴുതാനുള്ള ആകർഷകമായ ചെറിയ മലയാളം വരി | വാർത്തയുടെ പൂർണ്ണ വിവരങ്ങൾ അടങ്ങിയ വളരെ വിശദമായ മലയാളം ക്യാപ്ഷൻ, നിങ്ങളുടെ അഭിപ്രായം താഴെ പറയൂ എന്ന വരി, ഫോളോ ചെയ്യാനുള്ള അഭ്യർത്ഥന, ഹാഷ്‌ടാഗുകൾ | ഫോട്ടോ ഇന്റർനെറ്റിൽ തിരയാൻ സഹായിക്കുന്ന 2 ഇംഗ്ലീഷ് വാക്കുകൾ
+    ചിത്രത്തിൽ എഴുതാനുള്ള ആകർഷകമായ ചെറിയ മലയാളം വരി | വാർത്തയുടെ പൂർണ്ണ വിവരങ്ങൾ അടങ്ങിയ വളരെ വിശദമായ മലയാളം ക്യാപ്ഷൻ, അഭിപ്രായം ചോദിക്കുന്ന വരി, ഫോളോ ചെയ്യാനുള്ള അഭ്യർത്ഥന, ഹാഷ്‌ടാഗുകൾ | ഫോട്ടോ ഗൂഗിളിൽ തിരയാനുള്ള വാർത്തയുടെ യഥാർത്ഥ മലയാളം തലക്കെട്ട് (ഉദാഹരണത്തിന്: 'സ്വർണ്ണവില പവന് 400 രൂപ കുറഞ്ഞു', 'സഞ്ജു സാംസൺ സെഞ്ചുറി നേടി', 'റെയിൽവേയിൽ പുതിയ മാറ്റങ്ങൾ')
     """
     
     headers = {'Content-Type': 'application/json'}
@@ -85,40 +86,46 @@ def get_post_content(topics_list):
     return None, None, None
 
 def fetch_image(query):
-    print(f"തിരയുന്ന ഫോട്ടോ: {query}")
-    search_query = query + " news high quality"
-    headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'}
+    # AI തരുന്ന മലയാളം വാർത്താ തലക്കെട്ട് നേരിട്ട് ഗൂഗിളിൽ തിരയുന്നു
+    print(f"ഗൂഗിളിൽ തിരയുന്ന വാർത്താ തലക്കെട്ട്: {query}")
+    search_query = query
+    headers = {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+    }
     
     try:
-        print("Bing-ൽ തിരയുന്നു...")
-        bing_url = f"https://www.bing.com/images/search?q={urllib.parse.quote(search_query)}"
-        html = requests.get(bing_url, headers=headers, timeout=20).text
-        image_urls = re.findall(r'murl&quot;:&quot;(http[^&]+)&quot;', html)
+        print("Google Images-ൽ നേരിട്ട് തിരയുന്നു...")
+        google_url = f"https://www.google.com/search?q={urllib.parse.quote(search_query)}&tbm=isch"
+        html = requests.get(google_url, headers=headers, timeout=20).text
+        
+        image_urls = re.findall(r'(https?://[^"\'\s>]+?\.(?:jpg|jpeg|png))', html, re.IGNORECASE)
+        
         for img_url in image_urls:
+            if 'gstatic' not in img_url and 'logo' not in img_url.lower() and 'icon' not in img_url.lower() and 'avatar' not in img_url.lower():
+                try:
+                    clean_url = img_url.replace('\\', '')
+                    img_resp = requests.get(clean_url, headers=headers, timeout=10)
+                    if img_resp.status_code == 200:
+                        img = Image.open(BytesIO(img_resp.content))
+                        if img.width > 300 and img.height > 300:
+                            return img.convert('RGB')
+                except:
+                    continue
+    except Exception as e:
+        print("Google Search Error:", e)
+
+    try:
+        print("DuckDuckGo-യിൽ തിരയുന്നു...")
+        from ddgs import DDGS
+        results = DDGS().images(search_query, max_results=3)
+        for res in results:
             try:
-                img_resp = requests.get(img_url, headers=headers, timeout=10)
+                img_resp = requests.get(res['image'], headers=headers, timeout=10)
                 if img_resp.status_code == 200:
                     img = Image.open(BytesIO(img_resp.content))
                     return img.convert('RGB')
             except:
                 continue
-    except:
-        pass
-
-    try:
-        print("Google Images-ൽ തിരയുന്നു...")
-        google_url = f"https://www.google.com/search?q={urllib.parse.quote(search_query)}&tbm=isch"
-        html = requests.get(google_url, headers=headers, timeout=20).text
-        image_urls = re.findall(r'https?://[^"\'\s>]+(?:\.jpg|\.jpeg|\.png)', html)
-        for img_url in image_urls:
-            if 'gstatic' not in img_url and 'logo' not in img_url.lower():
-                try:
-                    img_resp = requests.get(img_url, headers=headers, timeout=10)
-                    if img_resp.status_code == 200:
-                        img = Image.open(BytesIO(img_resp.content))
-                        return img.convert('RGB')
-                except:
-                    continue
     except:
         pass
 
@@ -144,7 +151,7 @@ def process_and_add_text(image, text):
         image = image.crop((0, top, target_size, top + target_size))
 
     image = image.convert("RGBA")
-    overlay = Image.new('RGBA', image.size, (0, 0, 0, 140)) # ബാക്ക്ഗ്രൗണ്ട് ഫോട്ടോ അല്പം കൂടി ഡാർക്ക് ആക്കി
+    overlay = Image.new('RGBA', image.size, (0, 0, 0, 140)) 
     image = Image.alpha_composite(image, overlay)
     
     image = image.convert("RGB")
@@ -153,7 +160,6 @@ def process_and_add_text(image, text):
     
     font_path = "MalayalamFont.ttf"
     try:
-        # ഫോണ്ടിന്റെ വലിപ്പം വർദ്ധിപ്പിച്ചു (width/13)
         font = ImageFont.truetype(font_path, int(width/13))
     except Exception as e:
         font = ImageFont.load_default()
@@ -189,11 +195,10 @@ def process_and_add_text(image, text):
     except:
         line_height = int(width/13)
         
-    line_spacing = 40 # ലൈനുകൾ തമ്മിലുള്ള അകലം കൂട്ടി
+    line_spacing = 40 
     total_text_height = (len(lines) * line_height) + ((len(lines) - 1) * line_spacing)
     y_text = (height - total_text_height) // 2  
     
-    # കുറച്ചുകൂടി കടുപ്പമുള്ള അട്രാക്റ്റീവ് നിറങ്ങൾ
     bg_colors = [(204, 0, 0), (255, 204, 0), (0, 80, 160), (20, 20, 20)]
     text_colors = [(255, 255, 255), (0, 0, 0), (255, 255, 255), (255, 255, 255)] 
     
@@ -210,7 +215,6 @@ def process_and_add_text(image, text):
             
         x_text = (width - text_w) / 2
         
-        # ബോക്സിൻ്റെ പാഡിംഗ് (വീതി) കൂട്ടി
         padding_x = 40
         padding_y = 20
         
