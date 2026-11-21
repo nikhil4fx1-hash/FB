@@ -52,7 +52,6 @@ def get_post_content(topics_list):
         if m not in models_to_try:
             models_to_try.append(m)
             
-    # AI-ക്കുള്ള നിർദ്ദേശം കൂടുതൽ വിശദമായ വാർത്തകൾ എഴുതാൻ വേണ്ടി മാറ്റി
     prompt = f"""
     താഴെ ഇന്നത്തെ പ്രധാന വാർത്തകളുടെ തലക്കെട്ടുകൾ നൽകിയിരിക്കുന്നു:
     {topics_list}
@@ -145,7 +144,7 @@ def process_and_add_text(image, text):
         image = image.crop((0, top, target_size, top + target_size))
 
     image = image.convert("RGBA")
-    overlay = Image.new('RGBA', image.size, (0, 0, 0, 120))
+    overlay = Image.new('RGBA', image.size, (0, 0, 0, 140)) # ബാക്ക്ഗ്രൗണ്ട് ഫോട്ടോ അല്പം കൂടി ഡാർക്ക് ആക്കി
     image = Image.alpha_composite(image, overlay)
     
     image = image.convert("RGB")
@@ -154,7 +153,8 @@ def process_and_add_text(image, text):
     
     font_path = "MalayalamFont.ttf"
     try:
-        font = ImageFont.truetype(font_path, int(width/15))
+        # ഫോണ്ടിന്റെ വലിപ്പം വർദ്ധിപ്പിച്ചു (width/13)
+        font = ImageFont.truetype(font_path, int(width/13))
     except Exception as e:
         font = ImageFont.load_default()
         
@@ -187,13 +187,14 @@ def process_and_add_text(image, text):
     try:
         line_height = draw.textbbox((0, 0), "ക്യ", font=font)[3] - draw.textbbox((0, 0), "ക്യ", font=font)[1]
     except:
-        line_height = int(width/15)
+        line_height = int(width/13)
         
-    line_spacing = 35 
+    line_spacing = 40 # ലൈനുകൾ തമ്മിലുള്ള അകലം കൂട്ടി
     total_text_height = (len(lines) * line_height) + ((len(lines) - 1) * line_spacing)
     y_text = (height - total_text_height) // 2  
     
-    bg_colors = [(211, 47, 47), (255, 193, 7), (13, 71, 161), (33, 33, 33)]
+    # കുറച്ചുകൂടി കടുപ്പമുള്ള അട്രാക്റ്റീവ് നിറങ്ങൾ
+    bg_colors = [(204, 0, 0), (255, 204, 0), (0, 80, 160), (20, 20, 20)]
     text_colors = [(255, 255, 255), (0, 0, 0), (255, 255, 255), (255, 255, 255)] 
     
     for i, line in enumerate(lines):
@@ -209,8 +210,9 @@ def process_and_add_text(image, text):
             
         x_text = (width - text_w) / 2
         
-        padding_x = 30
-        padding_y = 15
+        # ബോക്സിൻ്റെ പാഡിംഗ് (വീതി) കൂട്ടി
+        padding_x = 40
+        padding_y = 20
         
         draw.rectangle(
             [x_text - padding_x, y_text - padding_y, x_text + text_w + padding_x, y_text + line_height + padding_y],
@@ -222,7 +224,7 @@ def process_and_add_text(image, text):
         y_text += line_height + line_spacing
         
     image_path = "fb_post.jpg"
-    image.save(image_path, quality=95)
+    image.save(image_path, quality=100)
     return image_path
 
 def post_to_facebook(image_path, caption):
