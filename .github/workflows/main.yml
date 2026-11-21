@@ -10,28 +10,64 @@ on:
     - cron: '30 11 * * *'
     # രാത്രി 9:30 PM IST (16:00 UTC)
     - cron: '0 16 * * *'
-  workflow_dispatch: # മാനുവൽ ആയി റൺ ചെയ്യാനുള്ള ഓപ്ഷൻ
+  workflow_dispatch:      # മാനുവൽ ആയി റൺ ചെയ്യാനുള്ള ഓപ്ഷൻ
+
+permissions:
+  contents: write         # posted.json തിരികെ സേവ് ചെയ്യാൻ (ഒരേ വാർത്ത ആവർത്തിക്കാതിരിക്കാൻ)
+
+concurrency:
+  group: fb-auto-post     # രണ്ട് റൺ ഒരേ സമയം വരാതിരിക്കാൻ
+  cancel-in-progress: false
 
 jobs:
   post_to_fb:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
 
     steps:
     - name: Checkout Repository
-      uses: actions/checkout@v3
+      uses: actions/checkout@v4
 
     - name: Set up Python
-      uses: actions/setup-python@v4
+      uses: actions/setup-python@v5
       with:
-        python-version: '3.10'
+        python-version: '3.12'
+
+    - name: Install System Packages (Malayalam text rendering)
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y libraqm0 libfribidi0 libharfbuzz0b fonts-noto-core
 
     - name: Install Dependencies
       run: |
         python -m pip install --upgrade pip
-        pip install requests feedparser pillow duckduckgo-search
+        pip install requests feedparser pillow
 
     - name: Run Python Script
       env:
         GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
         FB_PAGE_ACCESS_TOKEN: ${{ secrets.FB_PAGE_ACCESS_TOKEN }}
+        # ഇമേജ് ഉറവിടങ്ങളുടെ ക്രമം. ഇഷ്ടം പോലെ മാറ്റാം (commons, openverse, gemini, pexels, pixabay, bing)
+        IMAGE_ORDER: "commons,openverse,gemini"
+        # ടെസ്റ്റ് ചെയ്യുമ്പോൾ താഴത്തെ വരിയുടെ # മാറ്റുക: ഫേസ്ബുക്കിൽ പോസ്റ്റ് പോകില്ല, ചിത്രം മാത്രം ഉണ്ടാകും
+        # DRY_RUN: "1"
       run: python main.py
+
+    - name: Upload poster (for checking)
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: fb_post
+        path: fb_post.jpg
+        if-no-files-found: ignore
+
+    - name: Save posted topics (avoid repeats)
+      run: |
+        git config user.name "github-actions[bot]"
+        git config user.email "github-actions[bot]@users.noreply.github.com"
+        git add posted.json || true
+        if ! git diff --cached --quiet; then
+          git commit -m "update posted topics"
+          git pull --rebase
+          git push
+        fi
